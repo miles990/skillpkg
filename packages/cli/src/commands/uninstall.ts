@@ -1,11 +1,12 @@
 /**
  * uninstall command - Remove a skill
  */
-import { createGlobalStore, createLocalStore } from '@skillpkg/core';
+import { createGlobalStore, createLocalStore, createAdapterManager } from '@skillpkg/core';
 import { logger, colors, withSpinner } from '../ui/index.js';
 
 interface UninstallOptions {
   global?: boolean;
+  clean?: boolean;
 }
 
 /**
@@ -33,7 +34,7 @@ export async function uninstallCommand(
   const skill = await store.getSkill(skillName);
   const version = skill?.version || 'unknown';
 
-  // Remove skill
+  // Remove skill from store
   const removed = await withSpinner(
     `Uninstalling ${colors.cyan(skillName)}@${version}`,
     () => store.removeSkill(skillName),
@@ -48,7 +49,23 @@ export async function uninstallCommand(
     process.exit(1);
   }
 
+  // Clean synced platform files if --clean flag is set
+  if (options.clean) {
+    const adapterManager = createAdapterManager();
+    await withSpinner(
+      `Cleaning synced files from platforms`,
+      () => adapterManager.removeFromAllPlatforms(skillName, process.cwd()),
+      {
+        successText: `Cleaned synced files`,
+        failText: `Failed to clean some platform files`,
+      }
+    );
+  }
+
   logger.blank();
   logger.success(`Removed ${colors.cyan(skillName)}`);
+  if (options.clean) {
+    logger.log(`${colors.dim('Also removed synced files from all platforms')}`);
+  }
   logger.blank();
 }

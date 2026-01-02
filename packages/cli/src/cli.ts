@@ -44,6 +44,7 @@ export function registerCommands(program: Command): void {
     .alias('rm')
     .description('Uninstall a skill')
     .option('-g, --global', 'Uninstall from global store')
+    .option('-c, --clean', 'Also remove synced files from all platforms')
     .action(uninstallCommand);
 
   // sync - Sync skills to platforms
