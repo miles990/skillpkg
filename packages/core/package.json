@@ -1,6 +1,6 @@
 {
   "name": "skillpkg-core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Core library for skillpkg - Agent Skills Package Manager",
   "type": "module",
   "main": "./dist/index.js",
