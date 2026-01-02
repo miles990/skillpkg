@@ -16,9 +16,8 @@ export interface TableOptions {
  * Create a styled table
  */
 export function createTable(options: TableOptions): Table.Table {
-  return new Table({
+  const tableConfig: Table.TableConstructorOptions = {
     head: options.head.map((h) => colors.cyan(h)),
-    colWidths: options.colWidths,
     style: {
       head: [],
       border: [],
@@ -40,7 +39,14 @@ export function createTable(options: TableOptions): Table.Table {
       'right-mid': '┤',
       middle: '│',
     },
-  });
+  };
+
+  // Only add colWidths if provided (cli-table3 crashes with undefined)
+  if (options.colWidths) {
+    tableConfig.colWidths = options.colWidths;
+  }
+
+  return new Table(tableConfig);
 }
 
 /**
