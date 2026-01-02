@@ -7,7 +7,7 @@
 | M1 | Config & State Management | 5 | [x] |
 | M2 | Dependency Resolution | 4 | [x] |
 | M3 | Sync Mechanism | 5 | [x] |
-| M4 | Installer Updates | 4 | [ ] |
+| M4 | Installer Updates | 4 | [x] |
 | M5 | CLI Commands | 5 | [ ] |
 | M6 | MCP Server Updates | 3 | [ ] |
 | M7 | Migration & Polish | 4 | [ ] |
@@ -150,32 +150,37 @@
 
 ### Tasks
 
-- [ ] 4.1 更新 install 流程
+- [x] 4.1 更新 install 流程
   - 整合 DependencyResolver
   - 安裝前解析所有依賴
   - MCP 依賴提示安裝
+  - 實作 `Installer.install()` 方法
 
-- [ ] 4.2 更新 uninstall 流程
+- [x] 4.2 更新 uninstall 流程
   - 檢查 dependents（誰依賴這個）
   - 有 dependents 時警告
   - 支援 `--force` 強制移除
   - 移除後清理孤兒依賴
+  - 實作 `Installer.uninstall()` 和 `canUninstall()` 方法
 
-- [ ] 4.3 實作 `installFromConfig()`
+- [x] 4.3 實作 `installFromConfig()`
   - 讀取 skillpkg.json
   - 安裝所有列出的 skills
   - 類似 `npm install`
 
-- [ ] 4.4 建立測試案例
+- [x] 4.4 建立測試案例 (20 tests)
   - 安裝帶依賴的 skill
   - 移除有依賴者的 skill
   - 從 config 批量安裝
+  - dry run 模式
+  - skipDependencies 模式
+  - 不存在 skill 錯誤處理
 
 ### 驗收標準
-- [ ] 依賴自動安裝
-- [ ] MCP 依賴有提示
-- [ ] 移除前檢查依賴
-- [ ] 孤兒依賴可清理
+- [x] 依賴自動安裝
+- [x] MCP 依賴有提示 (mcpRequired)
+- [x] 移除前檢查依賴
+- [x] 孤兒依賴可清理 (removeOrphans option)
 
 ---
 

@@ -41,3 +41,6 @@ export * from './resolver/index.js';
 
 // Syncer module - Sync to AI tools
 export * from './syncer/index.js';
+
+// Installer module - Dependency-aware installation
+export * from './installer/index.js';
