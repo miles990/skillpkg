@@ -17,3 +17,9 @@ export * from './store/index.js';
 
 // Adapters module
 export * from './adapters/index.js';
+
+// Importer module
+export * from './importer/index.js';
+
+// Exporter module
+export * from './exporter/index.js';
