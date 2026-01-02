@@ -6,5 +6,8 @@
 
 export const VERSION = '0.0.1';
 
-// Types will be exported from here
+// Types
 export * from './types.js';
+
+// Parser module
+export * from './parser/index.js';
