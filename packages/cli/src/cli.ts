@@ -9,6 +9,10 @@ import { uninstallCommand } from './commands/uninstall.js';
 import { syncCommand } from './commands/sync.js';
 import { importCommand } from './commands/import.js';
 import { exportCommand } from './commands/export.js';
+import { searchCommand } from './commands/search.js';
+import { infoCommand } from './commands/info.js';
+import { loginCommand, logoutCommand, whoamiCommand } from './commands/login.js';
+import { publishCommand } from './commands/publish.js';
 
 /**
  * Register all CLI commands
@@ -77,4 +81,55 @@ export function registerCommands(program: Command): void {
     .option('-a, --all', 'Export all skills')
     .option('--overwrite', 'Overwrite existing files')
     .action(exportCommand);
+
+  // search - Search for skills in the registry
+  program
+    .command('search <query>')
+    .description('Search for skills in the registry')
+    .option('-l, --limit <number>', 'Number of results per page', '20')
+    .option('-p, --page <number>', 'Page number', '1')
+    .option('-s, --sort <field>', 'Sort by (relevance, downloads, updated, name)')
+    .option('--json', 'Output as JSON')
+    .option('--registry <url>', 'Use custom registry')
+    .action(searchCommand);
+
+  // info - Get detailed information about a skill
+  program
+    .command('info <skill>')
+    .description('Get detailed information about a skill from the registry')
+    .option('--json', 'Output as JSON')
+    .option('--registry <url>', 'Use custom registry')
+    .action(infoCommand);
+
+  // login - Authenticate with a registry
+  program
+    .command('login')
+    .description('Authenticate with a registry')
+    .option('--registry <url>', 'Registry URL')
+    .option('-t, --token <token>', 'Auth token (for non-interactive use)')
+    .action(loginCommand);
+
+  // logout - Log out from a registry
+  program
+    .command('logout')
+    .description('Log out from a registry')
+    .option('--registry <url>', 'Registry URL')
+    .action(logoutCommand);
+
+  // whoami - Show current logged in user
+  program
+    .command('whoami')
+    .description('Show current logged in user')
+    .option('--registry <url>', 'Registry URL')
+    .action(whoamiCommand);
+
+  // publish - Publish a skill to the registry
+  program
+    .command('publish')
+    .description('Publish a skill to the registry')
+    .option('--tag <tag>', 'Publish with tag (default: latest)')
+    .option('--access <access>', 'Access level (public, restricted)')
+    .option('--registry <url>', 'Registry URL')
+    .option('--dry-run', 'Show what would be published without publishing')
+    .action(publishCommand);
 }

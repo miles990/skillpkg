@@ -23,3 +23,6 @@ export * from './importer/index.js';
 
 // Exporter module
 export * from './exporter/index.js';
+
+// Registry module
+export * from './registry/index.js';
