@@ -4,7 +4,7 @@
  * Core library for skillpkg - Agent Skills Package Manager
  */
 
-export const VERSION = '0.0.1';
+export const VERSION = '0.2.1';
 
 // Types
 export * from './types.js';
@@ -29,3 +29,9 @@ export * from './registry/index.js';
 
 // GitHub module - Search skills on GitHub
 export * from './github/index.js';
+
+// Config module - Project configuration (skillpkg.json)
+export * from './config/index.js';
+
+// State module - Installation state tracking (.skillpkg/state.json)
+export * from './state/index.js';
