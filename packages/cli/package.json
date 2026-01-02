@@ -1,0 +1,43 @@
+{
+  "name": "@skillpkg/cli",
+  "version": "0.0.1",
+  "description": "CLI for skillpkg - Agent Skills Package Manager",
+  "type": "module",
+  "bin": {
+    "skillpkg": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@skillpkg/core": "workspace:*",
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.3",
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.0",
+    "ora": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "cli",
+    "skillpkg",
+    "agent",
+    "skills"
+  ],
+  "license": "MIT"
+}
