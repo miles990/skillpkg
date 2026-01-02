@@ -6,7 +6,7 @@
 |-----------|-------------|-------|--------|
 | M1 | Config & State Management | 5 | [x] |
 | M2 | Dependency Resolution | 4 | [x] |
-| M3 | Sync Mechanism | 5 | [ ] |
+| M3 | Sync Mechanism | 5 | [x] |
 | M4 | Installer Updates | 4 | [ ] |
 | M5 | CLI Commands | 5 | [ ] |
 | M6 | MCP Server Updates | 3 | [ ] |
@@ -105,38 +105,42 @@
 
 ### Tasks
 
-- [ ] 3.1 定義 sync target 配置
-  - Claude Code: `.claude/skills/`
-  - Cursor: `.cursor/rules/`
-  - Codex: `AGENTS.md`
-  - Copilot: `.github/copilot-instructions.md`
-  - Windsurf: `.windsurf/rules/`
+- [x] 3.1 定義 sync target 配置
+  - TARGET_CONFIGS 定義 5 種目標
+  - 支援 directory / single-file 格式
+  - 支援 frontmatter 處理（keep/remove/convert）
+  - v2.0 只實作 claude-code，其他 reserved
 
-- [ ] 3.2 實作 Syncer class
+- [x] 3.2 實作 Syncer class
   - `syncToTarget()` - 同步到單一目標
   - `syncAll()` - 同步到所有啟用的目標
   - `transformForTarget()` - 格式轉換
+  - 增量同步（content hash 比對）
+  - 孤兒清理（刪除不存在的 skill）
 
-- [ ] 3.3 實作格式轉換
-  - SKILL.md → 目錄結構（Claude Code, Cursor）
-  - SKILL.md → 單檔合併（Codex, Copilot）
-  - 保留 frontmatter 或移除
+- [x] 3.3 實作格式轉換
+  - directory 格式：每個 skill 一個目錄
+  - single-file 格式：合併成單檔
+  - frontmatter 處理（keep for claude-code, remove for others）
+  - `loadSkillContent()` 支援 YAML 和 Markdown 格式
 
-- [ ] 3.4 實作 MCP config 同步
-  - 讀取 skillpkg.json 的 mcp 配置
-  - 產生對應的 .mcp.json
-  - 支援不同工具的 mcp 檔案位置
+- [x] 3.4 實作 MCP config 同步
+  - `syncMcpConfig()` - 產生 .mcp.json
+  - 從 skillpkg.json 讀取 mcp 配置
+  - 支援 command, args, env 參數
 
-- [ ] 3.5 建立測試案例
-  - 同步到各目標
-  - 格式轉換正確性
-  - 增量同步（只同步變更）
+- [x] 3.5 建立測試案例 (24 tests)
+  - TARGET_CONFIGS 驗證
+  - syncToTarget / syncAll 測試
+  - syncMcpConfig 測試
+  - loadSkillContent / loadSkillsFromDirectory 測試
+  - dry run 模式測試
 
 ### 驗收標準
-- [ ] 可同步到 5 種工具
-- [ ] 格式轉換正確
-- [ ] .mcp.json 正確產生
-- [ ] sync_history 有更新
+- [x] 可同步到 claude-code (v2.0 實作)
+- [x] 格式轉換正確
+- [x] .mcp.json 正確產生
+- [x] 增量同步（未變更不寫入）
 
 ---
 

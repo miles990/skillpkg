@@ -38,3 +38,6 @@ export * from './state/index.js';
 
 // Resolver module - Dependency resolution
 export * from './resolver/index.js';
+
+// Syncer module - Sync to AI tools
+export * from './syncer/index.js';

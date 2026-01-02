@@ -1,0 +1,426 @@
+/**
+ * Syncer tests
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { join } from 'path';
+import { mkdir, writeFile, readFile, rm } from 'fs/promises';
+import { existsSync } from 'fs';
+import {
+  Syncer,
+  createSyncer,
+  loadSkillContent,
+  loadSkillsFromDirectory,
+  TARGET_CONFIGS,
+  getTargetConfig,
+  getImplementedTargets,
+  getAllTargets,
+  type SkillContent,
+  type SyncerOptions,
+} from '../index.js';
+import type { SkillpkgConfig } from '../../config/types.js';
+
+// Test directory
+const TEST_DIR = join(process.cwd(), '.test-syncer');
+const SKILLS_DIR = join(TEST_DIR, 'skills');
+const OUTPUT_DIR = join(TEST_DIR, 'output');
+
+// Helper to create test skill content
+function createTestSkill(name: string, version = '1.0.0'): SkillContent {
+  const rawContent = `---
+name: ${name}
+version: ${version}
+description: Test skill ${name}
+---
+
+# ${name}
+
+This is the instruction content for ${name}.
+`;
+
+  return {
+    name,
+    version,
+    rawContent,
+    bodyContent: `# ${name}\n\nThis is the instruction content for ${name}.\n`,
+    frontmatter: { name, version, description: `Test skill ${name}` },
+  };
+}
+
+// Helper to setup test environment
+async function setupTestDir(): Promise<void> {
+  await mkdir(TEST_DIR, { recursive: true });
+  await mkdir(SKILLS_DIR, { recursive: true });
+  await mkdir(OUTPUT_DIR, { recursive: true });
+}
+
+// Helper to cleanup test environment
+async function cleanupTestDir(): Promise<void> {
+  if (existsSync(TEST_DIR)) {
+    await rm(TEST_DIR, { recursive: true, force: true });
+  }
+}
+
+describe('TARGET_CONFIGS', () => {
+  it('should have configuration for all sync targets', () => {
+    expect(TARGET_CONFIGS).toHaveProperty('claude-code');
+    expect(TARGET_CONFIGS).toHaveProperty('cursor');
+    expect(TARGET_CONFIGS).toHaveProperty('codex');
+    expect(TARGET_CONFIGS).toHaveProperty('copilot');
+    expect(TARGET_CONFIGS).toHaveProperty('windsurf');
+  });
+
+  it('should have claude-code as implemented', () => {
+    expect(TARGET_CONFIGS['claude-code'].implemented).toBe(true);
+  });
+
+  it('should mark other targets as not implemented', () => {
+    expect(TARGET_CONFIGS.cursor.implemented).toBe(false);
+    expect(TARGET_CONFIGS.codex.implemented).toBe(false);
+    expect(TARGET_CONFIGS.copilot.implemented).toBe(false);
+    expect(TARGET_CONFIGS.windsurf.implemented).toBe(false);
+  });
+
+  it('should have correct output paths', () => {
+    expect(TARGET_CONFIGS['claude-code'].outputPath).toBe('.claude/skills');
+    expect(TARGET_CONFIGS.cursor.outputPath).toBe('.cursor/rules');
+    expect(TARGET_CONFIGS.codex.outputPath).toBe('.');
+  });
+});
+
+describe('getTargetConfig', () => {
+  it('should return config for valid target', () => {
+    const config = getTargetConfig('claude-code');
+    expect(config.id).toBe('claude-code');
+    expect(config.displayName).toBe('Claude Code');
+  });
+});
+
+describe('getImplementedTargets', () => {
+  it('should return only implemented targets', () => {
+    const implemented = getImplementedTargets();
+    expect(implemented.length).toBe(1);
+    expect(implemented[0].id).toBe('claude-code');
+  });
+});
+
+describe('getAllTargets', () => {
+  it('should return all targets', () => {
+    const all = getAllTargets();
+    expect(all.length).toBe(5);
+  });
+});
+
+describe('Syncer', () => {
+  beforeEach(async () => {
+    await setupTestDir();
+  });
+
+  afterEach(async () => {
+    await cleanupTestDir();
+  });
+
+  describe('syncToTarget', () => {
+    it('should sync skills to directory format target', async () => {
+      const syncer = createSyncer();
+      const skills = new Map<string, SkillContent>();
+      skills.set('test-skill', createTestSkill('test-skill'));
+
+      const targetConfig = getTargetConfig('claude-code');
+      const result = await syncer.syncToTarget(
+        TEST_DIR,
+        skills,
+        targetConfig
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.files.length).toBeGreaterThan(0);
+
+      // Check file was created
+      const skillFile = join(TEST_DIR, '.claude/skills/test-skill/SKILL.md');
+      expect(existsSync(skillFile)).toBe(true);
+    });
+
+    it('should skip unimplemented targets', async () => {
+      const syncer = createSyncer();
+      const skills = new Map<string, SkillContent>();
+      skills.set('test-skill', createTestSkill('test-skill'));
+
+      const config: SkillpkgConfig = {
+        name: 'test-project',
+        sync_targets: { cursor: true },
+      };
+
+      const result = await syncer.syncAll(TEST_DIR, skills, config);
+
+      // Should have one target result with error
+      const cursorResult = result.targets.find((t) => t.target === 'cursor');
+      expect(cursorResult?.success).toBe(false);
+      expect(cursorResult?.errors[0]).toContain('not yet implemented');
+    });
+
+    it('should detect unchanged files', async () => {
+      const syncer = createSyncer();
+      const skills = new Map<string, SkillContent>();
+      skills.set('test-skill', createTestSkill('test-skill'));
+
+      const targetConfig = getTargetConfig('claude-code');
+
+      // First sync
+      await syncer.syncToTarget(TEST_DIR, skills, targetConfig);
+
+      // Second sync (should be unchanged)
+      const result = await syncer.syncToTarget(TEST_DIR, skills, targetConfig);
+
+      expect(result.success).toBe(true);
+      expect(result.files[0].action).toBe('unchanged');
+    });
+
+    it('should detect updated files', async () => {
+      const syncer = createSyncer();
+      const skills = new Map<string, SkillContent>();
+      skills.set('test-skill', createTestSkill('test-skill', '1.0.0'));
+
+      const targetConfig = getTargetConfig('claude-code');
+
+      // First sync
+      await syncer.syncToTarget(TEST_DIR, skills, targetConfig);
+
+      // Update skill
+      skills.set('test-skill', createTestSkill('test-skill', '2.0.0'));
+
+      // Second sync (should be updated)
+      const result = await syncer.syncToTarget(TEST_DIR, skills, targetConfig);
+
+      expect(result.success).toBe(true);
+      expect(result.files[0].action).toBe('updated');
+    });
+  });
+
+  describe('syncAll', () => {
+    it('should sync to all enabled targets', async () => {
+      const syncer = createSyncer();
+      const skills = new Map<string, SkillContent>();
+      skills.set('my-skill', createTestSkill('my-skill'));
+
+      const config: SkillpkgConfig = {
+        name: 'test-project',
+        sync_targets: { 'claude-code': true },
+      };
+
+      const result = await syncer.syncAll(TEST_DIR, skills, config);
+
+      expect(result.success).toBe(true);
+      expect(result.stats.skillsSynced).toBe(1);
+      expect(result.stats.filesCreated).toBeGreaterThan(0);
+    });
+
+    it('should use claude-code as default target', async () => {
+      const syncer = createSyncer();
+      const skills = new Map<string, SkillContent>();
+      skills.set('my-skill', createTestSkill('my-skill'));
+
+      const config: SkillpkgConfig = {
+        name: 'test-project',
+        // No sync_targets specified
+      };
+
+      const result = await syncer.syncAll(TEST_DIR, skills, config);
+
+      expect(result.success).toBe(true);
+      expect(result.targets.some((t) => t.target === 'claude-code')).toBe(true);
+    });
+  });
+
+  describe('syncMcpConfig', () => {
+    it('should create .mcp.json file', async () => {
+      const syncer = createSyncer();
+
+      const mcpConfigs = {
+        cipher: {
+          package: '@anthropic/mcp-cipher',
+          command: 'npx',
+          args: ['@anthropic/mcp-cipher'],
+        },
+      };
+
+      const result = await syncer.syncMcpConfig(TEST_DIR, mcpConfigs);
+
+      expect(result.action).toBe('created');
+      expect(existsSync(join(TEST_DIR, '.mcp.json'))).toBe(true);
+
+      // Verify content
+      const content = JSON.parse(await readFile(join(TEST_DIR, '.mcp.json'), 'utf-8'));
+      expect(content.mcpServers).toHaveProperty('cipher');
+    });
+
+    it('should detect unchanged .mcp.json', async () => {
+      const syncer = createSyncer();
+
+      const mcpConfigs = {
+        cipher: {
+          package: '@anthropic/mcp-cipher',
+        },
+      };
+
+      // First sync
+      await syncer.syncMcpConfig(TEST_DIR, mcpConfigs);
+
+      // Second sync
+      const result = await syncer.syncMcpConfig(TEST_DIR, mcpConfigs);
+
+      expect(result.action).toBe('unchanged');
+    });
+  });
+
+  describe('transformForTarget', () => {
+    it('should keep frontmatter for claude-code', () => {
+      const syncer = createSyncer();
+      const skill = createTestSkill('test');
+      const targetConfig = getTargetConfig('claude-code');
+
+      const result = syncer.transformForTarget(skill, targetConfig);
+
+      expect(result).toContain('---');
+      expect(result).toContain('name: test');
+    });
+
+    it('should remove frontmatter for codex', () => {
+      const syncer = createSyncer();
+      const skill = createTestSkill('test');
+      const targetConfig = getTargetConfig('codex');
+
+      const result = syncer.transformForTarget(skill, targetConfig);
+
+      expect(result).not.toContain('---');
+      expect(result).not.toContain('name: test');
+      expect(result).toContain('This is the instruction content');
+    });
+  });
+
+  describe('dry run mode', () => {
+    it('should not write files in dry run mode', async () => {
+      const syncer = createSyncer();
+      const skills = new Map<string, SkillContent>();
+      skills.set('test-skill', createTestSkill('test-skill'));
+
+      const targetConfig = getTargetConfig('claude-code');
+      const options: SyncerOptions = { dryRun: true };
+
+      const result = await syncer.syncToTarget(TEST_DIR, skills, targetConfig, options);
+
+      expect(result.success).toBe(true);
+      expect(result.files.length).toBeGreaterThan(0);
+
+      // File should NOT be created
+      const skillFile = join(TEST_DIR, '.claude/skills/test-skill/SKILL.md');
+      expect(existsSync(skillFile)).toBe(false);
+    });
+  });
+});
+
+describe('loadSkillContent', () => {
+  beforeEach(async () => {
+    await setupTestDir();
+  });
+
+  afterEach(async () => {
+    await cleanupTestDir();
+  });
+
+  it('should load skill from SKILL.md with frontmatter', async () => {
+    const skillPath = join(TEST_DIR, 'SKILL.md');
+    const content = `---
+name: my-skill
+version: 2.0.0
+description: My awesome skill
+---
+
+# My Skill
+
+Instructions here.
+`;
+    await writeFile(skillPath, content);
+
+    const skill = await loadSkillContent(skillPath);
+
+    expect(skill.name).toBe('my-skill');
+    expect(skill.version).toBe('2.0.0');
+    expect(skill.bodyContent).toContain('# My Skill');
+    expect(skill.bodyContent).not.toContain('---');
+  });
+
+  it('should load skill from skill.yaml', async () => {
+    const skillPath = join(TEST_DIR, 'skill.yaml');
+    const content = `name: yaml-skill
+version: 1.5.0
+instructions: |
+  These are the instructions.
+`;
+    await writeFile(skillPath, content);
+
+    const skill = await loadSkillContent(skillPath);
+
+    expect(skill.name).toBe('yaml-skill');
+    expect(skill.version).toBe('1.5.0');
+  });
+
+  it('should handle markdown without frontmatter', async () => {
+    const skillPath = join(TEST_DIR, 'SKILL.md');
+    const content = `# No Frontmatter Skill
+
+Just plain markdown.
+`;
+    await writeFile(skillPath, content);
+
+    const skill = await loadSkillContent(skillPath);
+
+    expect(skill.name).toBe('unknown');
+    expect(skill.bodyContent).toContain('# No Frontmatter Skill');
+  });
+});
+
+describe('loadSkillsFromDirectory', () => {
+  beforeEach(async () => {
+    await setupTestDir();
+  });
+
+  afterEach(async () => {
+    await cleanupTestDir();
+  });
+
+  it('should load all skills from directory', async () => {
+    // Create test skills
+    const skill1Dir = join(SKILLS_DIR, 'skill-one');
+    const skill2Dir = join(SKILLS_DIR, 'skill-two');
+    await mkdir(skill1Dir, { recursive: true });
+    await mkdir(skill2Dir, { recursive: true });
+
+    await writeFile(
+      join(skill1Dir, 'SKILL.md'),
+      `---\nname: skill-one\nversion: 1.0.0\n---\nContent 1`
+    );
+    await writeFile(
+      join(skill2Dir, 'SKILL.md'),
+      `---\nname: skill-two\nversion: 2.0.0\n---\nContent 2`
+    );
+
+    const skills = await loadSkillsFromDirectory(SKILLS_DIR);
+
+    expect(skills.size).toBe(2);
+    expect(skills.has('skill-one')).toBe(true);
+    expect(skills.has('skill-two')).toBe(true);
+  });
+
+  it('should return empty map for non-existent directory', async () => {
+    const skills = await loadSkillsFromDirectory('/non/existent/path');
+    expect(skills.size).toBe(0);
+  });
+
+  it('should skip directories without SKILL.md', async () => {
+    const emptyDir = join(SKILLS_DIR, 'empty-skill');
+    await mkdir(emptyDir, { recursive: true });
+
+    const skills = await loadSkillsFromDirectory(SKILLS_DIR);
+    expect(skills.has('empty-skill')).toBe(false);
+  });
+});
