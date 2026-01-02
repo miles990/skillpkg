@@ -4,7 +4,7 @@ MCP Server for skillpkg - Enable AI agents to search, install, and manage skills
 
 ## Features
 
-- **8 MCP Tools** for complete skill lifecycle management
+- **7 MCP Tools** for complete skill lifecycle management
 - **Multi-source installation** - Registry, GitHub, Gist, URL, Local
 - **Smart recommendations** with relevance scoring
 - **Graceful degradation** when registry unavailable
@@ -54,8 +54,7 @@ await server.start();
 | `load_skill` | Load a skill's full content including instructions |
 | `install_skill` | Install a skill from various sources |
 | `uninstall_skill` | Remove an installed skill |
-| `search_skills` | Search installed and registry skills |
-| `search_registry` | Search the skill registry only |
+| `search_skills` | Search skills (source: all/local/registry) |
 | `skill_info` | Get detailed info about a skill |
 | `recommend_skill` | Get AI-powered skill recommendations |
 

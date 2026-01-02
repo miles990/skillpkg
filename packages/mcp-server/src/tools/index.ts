@@ -13,7 +13,6 @@ import { createLoadSkillHandler } from './load-skill.js';
 import { createSearchSkillsHandler } from './search-skills.js';
 import { createInstallSkillHandler } from './install-skill.js';
 import { createUninstallSkillHandler } from './uninstall-skill.js';
-import { createSearchRegistryHandler } from './search-registry.js';
 import { createSkillInfoHandler } from './skill-info.js';
 import { createRecommendSkillHandler } from './recommend-skill.js';
 
@@ -30,7 +29,6 @@ export function createAllToolHandlers(): ToolHandler[] {
 
     // Search & Discovery
     createSearchSkillsHandler(),
-    createSearchRegistryHandler(),
     createSkillInfoHandler(),
     createRecommendSkillHandler(),
   ];
@@ -43,7 +41,6 @@ export {
   createSearchSkillsHandler,
   createInstallSkillHandler,
   createUninstallSkillHandler,
-  createSearchRegistryHandler,
   createSkillInfoHandler,
   createRecommendSkillHandler,
 };
