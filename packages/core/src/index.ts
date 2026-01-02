@@ -14,3 +14,6 @@ export * from './parser/index.js';
 
 // Store module
 export * from './store/index.js';
+
+// Adapters module
+export * from './adapters/index.js';
