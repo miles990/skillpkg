@@ -11,3 +11,6 @@ export * from './types.js';
 
 // Parser module
 export * from './parser/index.js';
+
+// Store module
+export * from './store/index.js';
