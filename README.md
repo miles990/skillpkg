@@ -26,7 +26,9 @@ Manage, share, and sync AI agent skills across platforms. Works with **Claude Co
 
 - **Search skills on GitHub** — Find skills with `SKILL.md` files (industry standard)
 - **Cross-platform sync** — One skill, multiple AI platforms
-- **MCP Server** — Let AI agents install skills themselves
+- **Dependency management** — Automatic skill dependency resolution (v2.0)
+- **Project configuration** — `skillpkg.json` for reproducible setups (v2.0)
+- **MCP Server** — Let AI agents install, uninstall, and sync skills
 - **CLI & API** — Flexible integration options
 
 ## Quick Start
@@ -86,15 +88,20 @@ skillpkg sync my-skill --target claude-code,codex
 
 | Command | Description |
 |---------|-------------|
-| `skillpkg search <query>` | Search for skills on GitHub |
-| `skillpkg install <source>` | Install a skill from GitHub, URL, or local path |
-| `skillpkg list` | List installed skills |
-| `skillpkg uninstall <skill>` | Remove an installed skill |
+| `skillpkg init` | Initialize a project with skillpkg.json |
+| `skillpkg install [source]` | Install skill(s) with dependency resolution |
+| `skillpkg uninstall <skill>` | Remove a skill (checks dependencies) |
+| `skillpkg list` | List installed skills with dependency info |
 | `skillpkg sync [skill]` | Sync skills to AI platforms |
+| `skillpkg status` | Show project status (skills, MCP, sync) |
+| `skillpkg deps <skill>` | Show dependencies of a skill |
+| `skillpkg why <skill>` | Show why a skill is installed |
+| `skillpkg tree` | Show full dependency tree |
+| `skillpkg search <query>` | Search for skills on GitHub |
+| `skillpkg info <skill>` | Get detailed skill information |
 | `skillpkg import [path]` | Import existing skills from platform formats |
 | `skillpkg export [skill]` | Export skills to various formats |
-| `skillpkg init` | Create a new skill.yaml |
-| `skillpkg info <skill>` | Get detailed skill information |
+| `skillpkg migrate` | Migrate from v1.x to v2.0 |
 
 ### Install Sources
 
@@ -149,11 +156,12 @@ claude mcp add skillpkg -- npx -y skillpkg-mcp-server
 
 | Tool | Description |
 |------|-------------|
-| `list_skills` | List installed skills |
+| `list_skills` | List installed skills with dependency info |
 | `search_skills` | Search for skills on GitHub |
 | `recommend_skill` | Get skill recommendations for a use case |
-| `install_skill` | Install a skill from various sources |
-| `uninstall_skill` | Remove an installed skill |
+| `install_skill` | Install a skill with dependency resolution |
+| `uninstall_skill` | Remove a skill (with dependency check) |
+| `sync_skills` | Sync skills to AI platforms (v2.0) |
 | `load_skill` | Load a skill's instructions |
 | `skill_info` | Get detailed information about a registry skill |
 
@@ -173,6 +181,31 @@ Claude: I'll search for a relevant skill...
 
         Now I can help you write better commits!
 ```
+
+## Project Configuration (v2.0)
+
+Create a `skillpkg.json` to manage project skills:
+
+```json
+{
+  "name": "my-project",
+  "version": "1.0.0",
+  "skills": {
+    "commit-helper": "github:anthropics/commit-helper",
+    "code-reviewer": "github:my-org/code-reviewer"
+  },
+  "mcp": {
+    "context7": {
+      "package": "@context7/mcp-server"
+    }
+  },
+  "sync_targets": {
+    "claude-code": true
+  }
+}
+```
+
+Then run `skillpkg install` to install all skills with their dependencies.
 
 ## SKILL.md Format
 
@@ -214,9 +247,9 @@ skillpkg searches these locations in order:
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| [skillpkg-cli](https://www.npmjs.com/package/skillpkg-cli) | 0.2.0 | Command-line interface |
-| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | 0.3.0 | MCP Server for AI agents |
-| [skillpkg-core](https://www.npmjs.com/package/skillpkg-core) | 0.2.0 | Core library |
+| [skillpkg-cli](https://www.npmjs.com/package/skillpkg-cli) | 0.3.0 | Command-line interface |
+| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | 0.3.1 | MCP Server for AI agents |
+| [skillpkg-core](https://www.npmjs.com/package/skillpkg-core) | 0.3.0 | Core library |
 
 ## Storage Locations
 

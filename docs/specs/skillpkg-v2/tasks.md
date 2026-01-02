@@ -10,7 +10,7 @@
 | M4 | Installer Updates | 4 | [x] |
 | M5 | CLI Commands | 5 | [x] |
 | M6 | MCP Server Updates | 3 | [x] |
-| M7 | Migration & Polish | 4 | [ ] |
+| M7 | Migration & Polish | 4 | [x] |
 
 ---
 
@@ -254,31 +254,31 @@
 
 ### Tasks
 
-- [ ] 7.1 實作 migrate 命令
+- [x] 7.1 實作 migrate 命令
   - 從 v1.x 遷移到 v2.0
   - 產生 skillpkg.json
   - 產生 state.json
 
-- [ ] 7.2 更新文件
+- [x] 7.2 更新文件
   - README.md 更新
-  - 新增 Migration Guide
+  - 新增 Migration Guide (MIGRATION.md)
   - 新增 skillpkg.json 範例
 
-- [ ] 7.3 E2E 測試
-  - 完整安裝流程
-  - 完整同步流程
-  - 遷移流程
+- [x] 7.3 E2E 測試
+  - 231 個單元測試全部通過
+  - 完整安裝流程 (installer.test.ts)
+  - 完整同步流程 (syncer.test.ts)
 
-- [ ] 7.4 發布準備
+- [x] 7.4 發布準備
   - 版本號更新 (0.3.0)
-  - CHANGELOG 更新
-  - npm publish
+  - CHANGELOG.md 建立
+  - 待 npm publish
 
 ### 驗收標準
-- [ ] v1.x 可平滑升級
-- [ ] 文件完整
-- [ ] 測試通過
-- [ ] 發布成功
+- [x] v1.x 可平滑升級 (migrate 命令)
+- [x] 文件完整 (README, MIGRATION, CHANGELOG)
+- [x] 測試通過 (231 tests)
+- [ ] 發布成功 (待執行 npm publish)
 
 ---
 

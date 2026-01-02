@@ -53,7 +53,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "skillpkg-core": "^0.2.1",
+    "skillpkg-core": "^0.3.0",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
