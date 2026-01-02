@@ -2,6 +2,7 @@
  * Tool: recommend_skill
  *
  * Recommends the best skill for a given use case.
+ * Searches GitHub for repositories with SKILL.md files.
  */
 
 import type {
@@ -13,7 +14,8 @@ import type {
   AlternativeSkill,
   RecommendCriteria,
 } from '../types.js';
-import { getRegistryClient, successResult, errorResult, validateString, calculateRelevanceScore } from './utils.js';
+import { successResult, errorResult, validateString, calculateRelevanceScore } from './utils.js';
+import { searchGitHubSkills, type GitHubSkillResult } from './github-search.js';
 
 export function createRecommendSkillHandler(): ToolHandler {
   return {
@@ -44,39 +46,42 @@ export function createRecommendSkillHandler(): ToolHandler {
         const query = validateString(input.query, 'query');
         const criteria: RecommendCriteria = input.criteria || 'auto';
 
-        const client = getRegistryClient();
+        // Search GitHub for skills with SKILL.md
+        const githubResults = await searchGitHubSkills(query, { limit: 10 });
 
-        // Search for relevant skills
-        const searchResult = await client.search(query, { limit: 10 });
-
-        if (searchResult.results.length === 0) {
+        if (githubResults.length === 0) {
           return successResult(
-            `No skills found matching "${query}". Try a different search term or browse available skills with search_registry.`
+            `No skills found matching "${query}". Try a different search term or search GitHub manually for SKILL.md files.`
           );
         }
 
         // Score and sort based on criteria
-        type ScoredSkill = { skill: typeof searchResult.results[0]; score: number };
-        const scoredSkills: ScoredSkill[] = searchResult.results.map((skill) => {
+        type ScoredSkill = { skill: GitHubSkillResult; score: number };
+        const scoredSkills: ScoredSkill[] = githubResults.map((skill) => {
           let score = calculateRelevanceScore(
             {
               name: skill.name,
               description: skill.description,
-              downloads: skill.downloads,
+              downloads: skill.stars, // Use stars as popularity metric
               updatedAt: skill.updatedAt,
-              tags: skill.keywords,
+              tags: skill.topics,
             },
             query
           );
 
+          // Boost repos with SKILL.md
+          if (skill.hasSkill) {
+            score += 30;
+          }
+
           // Adjust score based on criteria
           switch (criteria) {
             case 'popular':
-              score = (skill.downloads || 0) / 1000 + score * 0.3;
+              score = skill.stars / 100 + score * 0.3;
               break;
             case 'highest_rated':
-              // Rating not available yet, use downloads as proxy
-              score = Math.log10((skill.downloads || 0) + 1) * 10 + score * 0.3;
+              // Use stars as rating proxy
+              score = Math.log10(skill.stars + 1) * 10 + score * 0.3;
               break;
             case 'newest':
               if (skill.updatedAt) {
@@ -97,62 +102,68 @@ export function createRecommendSkillHandler(): ToolHandler {
         // Get top recommendation
         const topSkill = scoredSkills[0].skill;
         const recommendation: RecommendedSkill = {
-          id: topSkill.name,
+          id: topSkill.fullName,
           name: topSkill.name,
           description: topSkill.description,
-          version: topSkill.version,
-          rating: 0, // Not available yet
-          downloads: topSkill.downloads || 0,
-          updatedAt: topSkill.updatedAt || new Date().toISOString(),
-          author: topSkill.author || 'Unknown',
-          tags: topSkill.keywords || [],
+          version: '1.0.0', // GitHub doesn't have version info
+          rating: 0,
+          downloads: topSkill.stars,
+          updatedAt: topSkill.updatedAt,
+          author: topSkill.fullName.split('/')[0], // Extract owner from fullName
+          tags: topSkill.topics || [],
         };
 
         // Get alternatives (next 3)
         const alternatives: AlternativeSkill[] = scoredSkills.slice(1, 4).map((item: ScoredSkill) => ({
           name: item.skill.name,
           description: item.skill.description,
-          rating: 0, // Not available yet
+          rating: 0,
         }));
 
         // Generate reason based on criteria
         let reason = `"${recommendation.name}" is recommended because `;
+        const hasSkillMd = topSkill.hasSkill ? ' It has a SKILL.md file with proper instructions.' : '';
         switch (criteria) {
           case 'popular':
-            reason += `it's the most popular skill (${recommendation.downloads} downloads) that matches your needs.`;
+            reason += `it's the most popular (⭐${recommendation.downloads}) that matches your needs.${hasSkillMd}`;
             break;
           case 'highest_rated':
-            reason += `it has the highest rating (${recommendation.rating.toFixed(1)}⭐) among matching skills.`;
+            reason += `it has the highest stars (⭐${recommendation.downloads}) among matching skills.${hasSkillMd}`;
             break;
           case 'newest':
-            reason += `it was recently updated and matches your requirements.`;
+            reason += `it was recently updated and matches your requirements.${hasSkillMd}`;
             break;
           default:
-            reason += `it best matches "${query}" based on name, description, popularity, and rating.`;
+            reason += `it best matches "${query}" based on name, description, and popularity.${hasSkillMd}`;
         }
+
+        // Determine install source
+        const installSource = topSkill.installSource || `github:${topSkill.fullName}`;
 
         const output: RecommendSkillOutput = {
           recommendation,
           reason,
           alternatives,
-          installCommand: `install_skill source: "${recommendation.name}"`,
+          installCommand: `install_skill source: "${installSource}"`,
         };
 
         // Format output
         let text = `## Recommended Skill\n\n`;
-        text += `**${recommendation.name}** v${recommendation.version}\n`;
+        text += `**${recommendation.name}**${topSkill.hasSkill ? ' ✓ SKILL.md' : ''}\n`;
         text += `${recommendation.description}\n\n`;
-        text += `⭐ ${recommendation.rating.toFixed(1)} | 📥 ${recommendation.downloads} downloads\n`;
-        text += `Author: ${recommendation.author}\n`;
+        text += `⭐ ${recommendation.downloads} stars | 🔗 ${topSkill.url}\n`;
+        text += `Owner: ${recommendation.author}\n`;
         if (recommendation.tags.length > 0) {
-          text += `Tags: ${recommendation.tags.join(', ')}\n`;
+          text += `Topics: ${recommendation.tags.join(', ')}\n`;
         }
         text += `\n**Why this skill?**\n${reason}\n`;
 
         if (alternatives.length > 0) {
           text += `\n## Alternatives\n\n`;
           for (const alt of alternatives) {
-            text += `• **${alt.name}** (⭐${alt.rating.toFixed(1)})\n`;
+            const altSkill = scoredSkills.find((s) => s.skill.name === alt.name)?.skill;
+            const hasSkill = altSkill?.hasSkill ? ' ✓' : '';
+            text += `• **${alt.name}**${hasSkill} (⭐${altSkill?.stars || 0})\n`;
             text += `  ${alt.description}\n\n`;
           }
         }
@@ -162,7 +173,10 @@ export function createRecommendSkillHandler(): ToolHandler {
         return successResult(text);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return errorResult(`Recommendation failed: ${message}`);
+        return errorResult(
+          `Recommendation failed: ${message}`,
+          'Set GITHUB_TOKEN environment variable for higher API rate limits.'
+        );
       }
     },
   };

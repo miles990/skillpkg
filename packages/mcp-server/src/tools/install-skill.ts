@@ -1,13 +1,15 @@
 /**
  * Tool: install_skill
  *
- * Installs a skill from registry, GitHub, Gist, URL, or local path.
+ * Installs a skill from GitHub, Gist, URL, or local path.
+ * Supports SKILL.md format (industry standard for Claude Code and OpenAI Codex).
  */
 
 import type { ToolHandler, ToolResult, InstallSkillInput, InstallSkillOutput, SourceType } from '../types.js';
-import { getStore, getRegistryClient, successResult, errorResult, validateString, validateScope } from './utils.js';
+import { getStore, successResult, errorResult, validateString, validateScope } from './utils.js';
 import { InvalidSourceError } from '../types.js';
 import { parse as parseSkillYaml } from 'skillpkg-core';
+import { parse as parseYaml } from 'yaml';
 
 /**
  * Parse source string to determine source type
@@ -36,12 +38,11 @@ function parseSource(source: string): { type: SourceType; value: string } {
     return { type: 'local', value: source };
   }
 
-  // Registry: skill name (alphanumeric with hyphens)
-  if (/^[a-z][a-z0-9-]*$/.test(source)) {
-    return { type: 'registry', value: source };
-  }
-
-  throw new InvalidSourceError(source);
+  // Simple skill names are no longer supported (no central registry)
+  // Suggest using github:owner/repo format instead
+  throw new InvalidSourceError(
+    `Invalid source "${source}". Use one of: github:owner/repo, gist:id, https://url, or ./local/path`
+  );
 }
 
 /**
@@ -56,15 +57,79 @@ async function fetchSkillFromUrl(url: string): Promise<string> {
 }
 
 /**
- * Fetch skill from GitHub repo (raw skill.yaml)
+ * Parse SKILL.md frontmatter (YAML between --- markers)
+ */
+interface SkillMdFrontmatter {
+  name?: string;
+  description?: string;
+  version?: string;
+  'allowed-tools'?: string;
+  metadata?: {
+    'short-description'?: string;
+  };
+}
+
+function parseSkillMdFrontmatter(
+  content: string
+): { frontmatter: SkillMdFrontmatter; body: string } | null {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) {
+    return null;
+  }
+
+  try {
+    const frontmatter = parseYaml(match[1]) as SkillMdFrontmatter;
+    return { frontmatter, body: match[2] };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch skill from GitHub repo (SKILL.md or skill.yaml)
  */
 async function fetchSkillFromGitHub(repo: string): Promise<string> {
-  // Try common locations for skill.yaml
-  const paths = ['skill.yaml', 'skill.yml', '.claude/skill.yaml'];
-  const branches = ['main', 'master'];
+  // Try SKILL.md first (industry standard), then fall back to skill.yaml
+  const skillMdPaths = [
+    'SKILL.md',
+    'skill.md',
+    'skills/SKILL.md',
+    'skills/skill.md',
+    '.claude/skills/skill.md',
+  ];
+  const skillYamlPaths = ['skill.yaml', 'skill.yml', '.claude/skill.yaml'];
+  const branches = ['main', 'master', 'HEAD'];
 
+  // Try SKILL.md first
   for (const branch of branches) {
-    for (const path of paths) {
+    for (const path of skillMdPaths) {
+      const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
+      try {
+        const content = await fetchSkillFromUrl(url);
+        const parsed = parseSkillMdFrontmatter(content);
+        if (parsed && parsed.frontmatter.name) {
+          // Convert SKILL.md to skill.yaml format for compatibility
+          const skillYaml = {
+            schema: '1.0',
+            name: parsed.frontmatter.name,
+            version: parsed.frontmatter.version || '1.0.0',
+            description:
+              parsed.frontmatter.description ||
+              parsed.frontmatter.metadata?.['short-description'] ||
+              '',
+            instructions: parsed.body,
+          };
+          return `schema: "1.0"\nname: ${skillYaml.name}\nversion: ${skillYaml.version}\ndescription: ${JSON.stringify(skillYaml.description)}\ninstructions: |\n${parsed.body.split('\n').map((l) => '  ' + l).join('\n')}`;
+        }
+      } catch {
+        // Try next path/branch
+      }
+    }
+  }
+
+  // Fall back to skill.yaml
+  for (const branch of branches) {
+    for (const path of skillYamlPaths) {
       const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
       try {
         const content = await fetchSkillFromUrl(url);
@@ -75,7 +140,7 @@ async function fetchSkillFromGitHub(repo: string): Promise<string> {
     }
   }
 
-  throw new Error(`Could not find skill.yaml in repository ${repo}`);
+  throw new Error(`Could not find SKILL.md or skill.yaml in repository ${repo}`);
 }
 
 /**
@@ -134,13 +199,12 @@ async function fetchSkillFromLocal(path: string): Promise<string> {
 export function createInstallSkillHandler(): ToolHandler {
   return {
     name: 'install_skill',
-    description: `Install a skill from various sources.
+    description: `Install a skill from various sources. Supports SKILL.md format (industry standard for Claude Code and OpenAI Codex).
 
 Supported source formats:
-• Registry: skill-name (e.g., "commit-helper")
 • GitHub: github:user/repo or user/repo (e.g., "anthropics/claude-code-skills")
 • Gist: gist:id (e.g., "gist:abc123")
-• URL: https://... (direct link to skill.yaml)
+• URL: https://... (direct link to SKILL.md or skill.yaml)
 • Local: ./path or /absolute/path (local file or directory)`,
     inputSchema: {
       type: 'object',
@@ -173,20 +237,6 @@ Supported source formats:
         let skillContent: string;
 
         switch (type) {
-          case 'registry': {
-            // Download from registry
-            const client = getRegistryClient();
-            const info = await client.getSkillInfo(value);
-            // For now, fetch the skill.yaml URL if available
-            // In future, download tarball and extract
-            if (info.repository) {
-              skillContent = await fetchSkillFromGitHub(info.repository.replace('https://github.com/', ''));
-            } else {
-              throw new Error(`Registry skill "${value}" does not have a repository URL`);
-            }
-            break;
-          }
-
           case 'github':
             skillContent = await fetchSkillFromGitHub(value);
             break;
@@ -241,7 +291,7 @@ Supported source formats:
 
         // Add the skill
         await store.addSkill(skill, {
-          source: type === 'local' ? 'local' : type === 'registry' ? 'registry' : 'import',
+          source: type === 'local' ? 'local' : 'import',
           sourceUrl: sourceStr,
         });
 

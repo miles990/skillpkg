@@ -9,8 +9,8 @@
 // ============================================================
 
 export type Scope = 'local' | 'global';
-export type Source = 'all' | 'local' | 'registry';
-export type SourceType = 'registry' | 'github' | 'gist' | 'url' | 'local';
+export type Source = 'all' | 'local' | 'github';
+export type SourceType = 'github' | 'gist' | 'url' | 'local';
 export type RecommendCriteria = 'auto' | 'popular' | 'highest_rated' | 'newest';
 
 export interface Author {
@@ -65,7 +65,7 @@ export interface SearchSkillResult {
   name: string;
   description: string;
   version: string;
-  source: 'local' | 'registry';
+  source: 'local' | 'github';
   installed: boolean;
   rating: number;
   downloads: number;

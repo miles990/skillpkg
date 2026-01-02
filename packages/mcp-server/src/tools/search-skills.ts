@@ -1,7 +1,8 @@
 /**
  * Tool: search_skills
  *
- * Searches for skills in local store and/or registry.
+ * Searches for skills in local store and/or GitHub.
+ * Uses SKILL.md format (industry standard for Claude Code and OpenAI Codex).
  */
 
 import type {
@@ -14,19 +15,19 @@ import type {
 import type { Scope } from '../types.js';
 import {
   getStore,
-  getRegistryClient,
   successResult,
   errorResult,
   validateString,
   validateLimit,
   calculateRelevanceScore,
 } from './utils.js';
+import { searchGitHubSkills } from './github-search.js';
 
 export function createSearchSkillsHandler(): ToolHandler {
   return {
     name: 'search_skills',
     description:
-      'Search for skills by keyword. Searches both installed skills and the registry, returning results sorted by relevance.',
+      'Search for skills by keyword. Searches both installed skills and GitHub repositories with SKILL.md files, returning results sorted by relevance.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -36,9 +37,9 @@ export function createSearchSkillsHandler(): ToolHandler {
         },
         source: {
           type: 'string',
-          enum: ['all', 'local', 'registry'],
+          enum: ['all', 'local', 'github'],
           default: 'all',
-          description: 'Where to search: all, local (installed only), or registry (remote only)',
+          description: 'Where to search: all, local (installed only), or github (GitHub repositories with SKILL.md)',
         },
         limit: {
           type: 'number',
@@ -106,55 +107,55 @@ export function createSearchSkillsHandler(): ToolHandler {
           }
         }
 
-        // Search registry
-        if (source === 'all' || source === 'registry') {
+        // Search GitHub
+        if (source === 'all' || source === 'github') {
           try {
-            const client = getRegistryClient();
-            const searchResult = await client.search(query, { limit });
+            const githubResults = await searchGitHubSkills(query, { limit });
 
-            for (const skill of searchResult.results) {
+            for (const skill of githubResults) {
               const isInstalled = installedNames.has(skill.name);
 
               // Skip if already in results from local
               if (isInstalled && source === 'all') {
-                // Update existing entry with registry metadata
+                // Update existing entry with GitHub metadata
                 const existing = results.find((r) => r.name === skill.name);
                 if (existing) {
-                  existing.downloads = skill.downloads || 0;
-                  existing.tags = skill.keywords || [];
+                  existing.downloads = skill.stars; // Use stars as popularity metric
+                  existing.tags = skill.topics || [];
                 }
                 continue;
               }
 
               results.push({
-                id: `registry:${skill.name}`,
+                id: `github:${skill.fullName}`,
                 name: skill.name,
                 description: skill.description,
-                version: skill.version,
-                source: 'registry',
+                version: '1.0.0', // GitHub doesn't have version info
+                source: 'github',
                 installed: isInstalled,
-                rating: 0, // Registry doesn't have ratings yet
-                downloads: skill.downloads || 0,
-                updatedAt: skill.updatedAt || new Date().toISOString(),
-                tags: skill.keywords || [],
+                rating: 0,
+                downloads: skill.stars, // Use stars as popularity metric
+                updatedAt: skill.updatedAt,
+                tags: skill.topics || [],
                 relevanceScore: calculateRelevanceScore(
                   {
                     name: skill.name,
                     description: skill.description,
-                    downloads: skill.downloads,
+                    downloads: skill.stars,
                     updatedAt: skill.updatedAt,
-                    tags: skill.keywords,
+                    tags: skill.topics,
                   },
                   query
-                ),
+                ) + (skill.hasSkill ? 20 : 0), // Boost repos with SKILL.md
               });
             }
-          } catch {
-            // Registry might be unavailable, continue with local results
-            if (source === 'registry') {
+          } catch (error) {
+            // GitHub might be unavailable or rate limited
+            if (source === 'github') {
+              const message = error instanceof Error ? error.message : 'Unknown error';
               return errorResult(
-                'Registry is currently unavailable.',
-                'Try searching with source: "local" to see installed skills.'
+                `GitHub search failed: ${message}`,
+                'Try searching with source: "local" to see installed skills, or set GITHUB_TOKEN for higher rate limits.'
               );
             }
           }
