@@ -1,6 +1,7 @@
 schema: "1.0"
 name: skillpkg
 version: 0.1.0
+license: MIT
 description: Agent Skills Package Manager - Install once, use everywhere. Manage, share, and sync AI agent skills across platforms.
 author:
   name: miles990

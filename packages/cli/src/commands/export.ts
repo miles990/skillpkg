@@ -5,8 +5,8 @@ import {
   createExporter,
   createLocalStore,
   createGlobalStore,
-} from '@skillpkg/core';
-import type { ExportFormat, Skill } from '@skillpkg/core';
+} from 'skillpkg-core';
+import type { ExportFormat, Skill } from 'skillpkg-core';
 import { logger, colors, withSpinner } from '../ui/index.js';
 
 interface ExportOptions {

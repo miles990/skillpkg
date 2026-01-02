@@ -5,8 +5,8 @@ import {
   createLocalStore,
   createAdapterManager,
   parse,
-} from '@skillpkg/core';
-import type { Skill, StoreManager } from '@skillpkg/core';
+} from 'skillpkg-core';
+import type { Skill, StoreManager } from 'skillpkg-core';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { logger, colors, withSpinner } from '../ui/index.js';

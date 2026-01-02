@@ -5,7 +5,7 @@ import {
   createRegistryClient,
   RegistryError,
   DEFAULT_REGISTRY_URL,
-} from '@skillpkg/core';
+} from 'skillpkg-core';
 import { logger, colors } from '../ui/index.js';
 
 interface InfoCommandOptions {

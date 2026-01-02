@@ -8,7 +8,7 @@ import {
   getUsername,
   createRegistryClient,
   DEFAULT_REGISTRY_URL,
-} from '@skillpkg/core';
+} from 'skillpkg-core';
 import { logger, colors, createPrompt } from '../ui/index.js';
 
 interface LoginCommandOptions {

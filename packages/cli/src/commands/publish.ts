@@ -11,8 +11,8 @@ import {
   isAuthenticated,
   RegistryError,
   DEFAULT_REGISTRY_URL,
-} from '@skillpkg/core';
-import type { Skill, PublishOptions } from '@skillpkg/core';
+} from 'skillpkg-core';
+import type { Skill, PublishOptions } from 'skillpkg-core';
 import { logger, colors, withSpinner, confirm } from '../ui/index.js';
 
 interface PublishCommandOptions {

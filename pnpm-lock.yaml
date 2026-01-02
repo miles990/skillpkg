@@ -32,9 +32,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@skillpkg/core':
-        specifier: workspace:*
-        version: link:../core
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -50,6 +47,9 @@ importers:
       ora:
         specifier: ^8.0.0
         version: 8.2.0
+      skillpkg-core:
+        specifier: workspace:*
+        version: link:../core
       tar-stream:
         specifier: ^3.1.7
         version: 3.1.7

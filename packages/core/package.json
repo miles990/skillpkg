@@ -1,6 +1,6 @@
 {
-  "name": "@skillpkg/core",
-  "version": "0.0.1",
+  "name": "skillpkg-core",
+  "version": "0.1.0",
   "description": "Core library for skillpkg - Agent Skills Package Manager",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,10 +27,27 @@
     "agent",
     "claude",
     "copilot",
-    "codex"
+    "codex",
+    "llm",
+    "package-manager"
   ],
-  "author": "",
+  "author": "miles990",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miles990/skillpkg.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/miles990/skillpkg#readme",
+  "bugs": {
+    "url": "https://github.com/miles990/skillpkg/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "@types/tar-stream": "^3.1.4",
     "typescript": "^5.3.0"

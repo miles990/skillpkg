@@ -5,8 +5,8 @@ import {
   createRegistryClient,
   RegistryError,
   DEFAULT_REGISTRY_URL,
-} from '@skillpkg/core';
-import type { SearchOptions } from '@skillpkg/core';
+} from 'skillpkg-core';
+import type { SearchOptions } from 'skillpkg-core';
 import { logger, colors } from '../ui/index.js';
 
 interface SearchCommandOptions {

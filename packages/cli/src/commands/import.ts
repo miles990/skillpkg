@@ -5,8 +5,8 @@ import {
   createImporter,
   createLocalStore,
   createGlobalStore,
-} from '@skillpkg/core';
-import type { DetectedFile, ImportResult } from '@skillpkg/core';
+} from 'skillpkg-core';
+import type { DetectedFile, ImportResult } from 'skillpkg-core';
 import { logger, colors, withSpinner, createTable } from '../ui/index.js';
 
 interface ImportOptions {

@@ -1,7 +1,7 @@
 {
-  "name": "@skillpkg/cli",
-  "version": "0.0.1",
-  "description": "CLI for skillpkg - Agent Skills Package Manager",
+  "name": "skillpkg-cli",
+  "version": "0.1.1",
+  "description": "CLI for skillpkg - Agent Skills Package Manager. Install once, use everywhere.",
   "type": "module",
   "bin": {
     "skillpkg": "./dist/index.js"
@@ -20,8 +20,37 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js"
   },
+  "keywords": [
+    "cli",
+    "skillpkg",
+    "agent",
+    "skills",
+    "ai",
+    "claude",
+    "copilot",
+    "codex",
+    "llm",
+    "package-manager"
+  ],
+  "author": "miles990",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miles990/skillpkg.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/miles990/skillpkg#readme",
+  "bugs": {
+    "url": "https://github.com/miles990/skillpkg/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "@skillpkg/core": "workspace:*",
+    "skillpkg-core": "^0.1.0",
     "chalk": "^5.3.0",
     "cli-table3": "^0.6.3",
     "commander": "^12.0.0",
@@ -34,12 +63,5 @@
     "@types/node": "^20.10.0",
     "@types/tar-stream": "^3.1.4",
     "typescript": "^5.3.0"
-  },
-  "keywords": [
-    "cli",
-    "skillpkg",
-    "agent",
-    "skills"
-  ],
-  "license": "MIT"
+  }
 }

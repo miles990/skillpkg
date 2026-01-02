@@ -5,8 +5,8 @@ import { existsSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join, basename } from 'path';
 import inquirer from 'inquirer';
-import { stringify } from '@skillpkg/core';
-import type { Skill } from '@skillpkg/core';
+import { stringify } from 'skillpkg-core';
+import type { Skill } from 'skillpkg-core';
 import { logger, colors, withSpinner } from '../ui/index.js';
 
 interface InitOptions {

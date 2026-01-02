@@ -5,8 +5,8 @@ import { existsSync, createReadStream } from 'fs';
 import { readFile } from 'fs/promises';
 import { join, resolve, isAbsolute } from 'path';
 import { createGunzip } from 'zlib';
-import { parse, createGlobalStore, createLocalStore } from '@skillpkg/core';
-import type { Skill } from '@skillpkg/core';
+import { parse, createGlobalStore, createLocalStore } from 'skillpkg-core';
+import type { Skill } from 'skillpkg-core';
 import { logger, colors, withSpinner } from '../ui/index.js';
 import * as tar from 'tar-stream';
 

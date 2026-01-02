@@ -1,8 +1,8 @@
 /**
  * list command - List installed skills
  */
-import { createGlobalStore, createLocalStore } from '@skillpkg/core';
-import type { SkillMeta } from '@skillpkg/core';
+import { createGlobalStore, createLocalStore } from 'skillpkg-core';
+import type { SkillMeta } from 'skillpkg-core';
 import { logger, colors, createTable, printTable } from '../ui/index.js';
 
 interface ListOptions {

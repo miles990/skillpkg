@@ -1,7 +1,7 @@
 /**
  * uninstall command - Remove a skill
  */
-import { createGlobalStore, createLocalStore, createAdapterManager } from '@skillpkg/core';
+import { createGlobalStore, createLocalStore, createAdapterManager } from 'skillpkg-core';
 import { logger, colors, withSpinner } from '../ui/index.js';
 
 interface UninstallOptions {
