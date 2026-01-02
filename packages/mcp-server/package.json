@@ -1,0 +1,63 @@
+{
+  "name": "skillpkg-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP Server for skillpkg - Enable AI agents to search, install, and manage skills via Model Context Protocol",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "skillpkg-mcp-server": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "skillpkg",
+    "ai",
+    "agent",
+    "claude",
+    "skills",
+    "package-manager"
+  ],
+  "author": "miles990",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miles990/skillpkg.git",
+    "directory": "packages/mcp-server"
+  },
+  "homepage": "https://github.com/miles990/skillpkg#readme",
+  "bugs": {
+    "url": "https://github.com/miles990/skillpkg/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "skillpkg-core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  }
+}

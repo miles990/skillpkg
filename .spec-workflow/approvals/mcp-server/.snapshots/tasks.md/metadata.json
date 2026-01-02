@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/mcp-server/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-01-02T09:19:20.356Z",
+      "trigger": "initial",
+      "approvalId": "approval_1767345560352_xestr97y6",
+      "approvalTitle": "MCP Server Tasks"
+    }
+  ]
+}
