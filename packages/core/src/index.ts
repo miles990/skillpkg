@@ -35,3 +35,6 @@ export * from './config/index.js';
 
 // State module - Installation state tracking (.skillpkg/state.json)
 export * from './state/index.js';
+
+// Resolver module - Dependency resolution
+export * from './resolver/index.js';

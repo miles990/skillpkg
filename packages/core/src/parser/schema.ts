@@ -119,9 +119,31 @@ export const skillSchema = {
       description: 'Platform-specific configurations',
     },
     dependencies: {
-      type: 'object',
-      additionalProperties: { type: 'string' },
-      description: 'Skill dependencies with version ranges',
+      oneOf: [
+        {
+          // Legacy format: Record<string, string> (name -> version)
+          type: 'object',
+          additionalProperties: { type: 'string' },
+        },
+        {
+          // New format: { skills?: string[], mcp?: string[] }
+          type: 'object',
+          properties: {
+            skills: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Skill dependencies (names or sources)',
+            },
+            mcp: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'MCP server dependencies',
+            },
+          },
+          additionalProperties: false,
+        },
+      ],
+      description: 'Skill and MCP dependencies',
     },
   },
   required: ['schema', 'name', 'version', 'description', 'instructions'],

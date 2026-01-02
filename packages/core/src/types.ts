@@ -8,6 +8,55 @@
 export const SCHEMA_VERSION = '1.0';
 
 /**
+ * Skill dependencies (new format for v2.0)
+ */
+export interface SkillDependencies {
+  /** Skill dependencies (names or sources) */
+  skills?: string[];
+  /** MCP server dependencies */
+  mcp?: string[];
+}
+
+/**
+ * Legacy dependencies format (Record<string, string>)
+ */
+export type LegacyDependencies = Record<string, string>;
+
+/**
+ * Union type for dependencies field
+ */
+export type Dependencies = SkillDependencies | LegacyDependencies;
+
+/**
+ * Check if dependencies is in new format
+ */
+export function isSkillDependencies(deps: Dependencies): deps is SkillDependencies {
+  return deps !== null && typeof deps === 'object' && ('skills' in deps || 'mcp' in deps);
+}
+
+/**
+ * Normalize dependencies to new format
+ */
+export function normalizeDependencies(deps?: Dependencies): SkillDependencies {
+  if (!deps) {
+    return { skills: [], mcp: [] };
+  }
+
+  if (isSkillDependencies(deps)) {
+    return {
+      skills: deps.skills || [],
+      mcp: deps.mcp || [],
+    };
+  }
+
+  // Legacy format: convert keys to skill names
+  return {
+    skills: Object.keys(deps),
+    mcp: [],
+  };
+}
+
+/**
  * Skill author information
  */
 export interface Author {
@@ -106,8 +155,8 @@ export interface Skill {
   /** Platform-specific configurations */
   platforms?: PlatformConfig;
 
-  /** Skill dependencies */
-  dependencies?: Record<string, string>;
+  /** Skill dependencies (skill→skill, skill→mcp) */
+  dependencies?: Dependencies;
 }
 
 /**

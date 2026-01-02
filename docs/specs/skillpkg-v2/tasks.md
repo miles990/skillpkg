@@ -5,7 +5,7 @@
 | Milestone | Description | Tasks | Status |
 |-----------|-------------|-------|--------|
 | M1 | Config & State Management | 5 | [x] |
-| M2 | Dependency Resolution | 4 | [ ] |
+| M2 | Dependency Resolution | 4 | [x] |
 | M3 | Sync Mechanism | 5 | [ ] |
 | M4 | Installer Updates | 4 | [ ] |
 | M5 | CLI Commands | 5 | [ ] |
@@ -61,32 +61,41 @@
 
 ### Tasks
 
-- [ ] 2.1 擴展 SKILL.md metadata 格式
+- [x] 2.1 擴展 SKILL.md metadata 格式
   - 在 frontmatter 加入 dependencies 欄位
   - 支援 `skills:` 和 `mcp:` 依賴
-  - 更新 parseSkillMetadata()
+  - 更新 parser schema 支援新格式
+  - 新增 `normalizeDependencies()` 函數處理新舊格式
 
-- [ ] 2.2 實作 DependencyResolver class
-  - `resolveDependencies()` - 遞迴解析所有依賴
+- [x] 2.2 實作 DependencyResolver class
+  - `resolveDependencies()` - 遞迴解析所有依賴（拓撲排序）
   - `buildDependencyTree()` - 建立依賴樹
   - `detectCircular()` - 檢測循環依賴
+  - `getDirectDependencies()` - 取得直接依賴
 
-- [ ] 2.3 實作依賴安裝流程
-  - 安裝前先解析完整依賴
-  - 按依賴順序安裝（被依賴的先裝）
-  - 記錄 installed_by 和 depended_by
+- [x] 2.3 實作依賴安裝流程
+  - `createInstallPlan()` - 從解析結果建立安裝計劃
+  - `recordDependencyInstall()` - 安裝後記錄依賴關係
+  - `formatInstallPlan()` - 格式化顯示安裝計劃
+  - 輔助函數：`getSkillsToInstall()`, `getInstallCount()`, `hasMcpRequirements()`
 
-- [ ] 2.4 建立測試案例
-  - 單層依賴
-  - 多層依賴（A→B→C）
-  - 循環依賴檢測
-  - MCP 依賴提示
+- [x] 2.4 建立測試案例 (38 tests total)
+  - DependencyResolver 測試 (21 tests)
+    - 單層/多層依賴解析
+    - 鑽石依賴處理
+    - 循環依賴檢測
+    - MCP 依賴收集與去重
+  - InstallPlan 測試 (17 tests)
+    - 安裝計劃建立
+    - 已安裝 skill 跳過
+    - 依賴記錄流程
+    - 格式化輸出
 
 ### 驗收標準
-- [ ] 正確解析 skill 依賴
-- [ ] 正確解析 MCP 依賴
-- [ ] 循環依賴會報錯
-- [ ] depended_by 正確記錄
+- [x] 正確解析 skill 依賴
+- [x] 正確解析 MCP 依賴
+- [x] 循環依賴會報錯
+- [x] depended_by 正確記錄 (via recordDependencyInstall)
 
 ---
 
