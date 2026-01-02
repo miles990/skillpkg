@@ -21,7 +21,7 @@ import {
   validateLimit,
   calculateRelevanceScore,
 } from './utils.js';
-import { searchGitHubSkills } from './github-search.js';
+import { searchGitHubSkills } from 'skillpkg-core';
 
 export function createSearchSkillsHandler(): ToolHandler {
   return {

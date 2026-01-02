@@ -24,5 +24,8 @@ export * from './importer/index.js';
 // Exporter module
 export * from './exporter/index.js';
 
-// Registry module
+// Registry module (deprecated - use GitHub module instead)
 export * from './registry/index.js';
+
+// GitHub module - Search skills on GitHub
+export * from './github/index.js';

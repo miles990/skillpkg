@@ -24,6 +24,7 @@ export interface GitHubSkillResult {
 
 export interface GitHubSearchOptions {
   limit?: number;
+  token?: string;
 }
 
 interface GitHubRepoSearchItem {
@@ -46,6 +47,7 @@ interface GitHubRepoSearchResponse {
 interface SkillMdFrontmatter {
   name?: string;
   description?: string;
+  version?: string;
   'allowed-tools'?: string;
   metadata?: {
     'short-description'?: string;
@@ -55,7 +57,7 @@ interface SkillMdFrontmatter {
 /**
  * Parse markdown frontmatter (YAML between --- markers)
  */
-function parseFrontmatter(
+export function parseSkillMdFrontmatter(
   content: string
 ): { frontmatter: SkillMdFrontmatter; body: string } | null {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
@@ -72,36 +74,44 @@ function parseFrontmatter(
 }
 
 /**
+ * Common SKILL.md file locations
+ */
+export const SKILL_MD_PATHS = [
+  'SKILL.md',
+  'skill.md',
+  'skills/SKILL.md',
+  'skills/skill.md',
+  '.claude/skills/skill.md',
+];
+
+/**
  * Check if a repository has a SKILL.md file
  */
-async function detectSkillMd(
-  repoFullName: string
-): Promise<{ hasSkill: boolean; skillFile?: string }> {
-  // Check common SKILL.md locations
-  const paths = [
-    'SKILL.md',
-    'skill.md',
-    'skills/SKILL.md',
-    'skills/skill.md',
-    '.claude/skills/skill.md',
-  ];
-
-  for (const path of paths) {
+export async function detectSkillMd(
+  repoFullName: string,
+  token?: string
+): Promise<{ hasSkill: boolean; skillFile?: string; content?: string }> {
+  for (const path of SKILL_MD_PATHS) {
     const rawUrl = `https://raw.githubusercontent.com/${repoFullName}/HEAD/${path}`;
 
     try {
-      const response = await fetch(rawUrl, {
-        headers: { 'User-Agent': 'skillpkg-mcp-server' },
-      });
+      const headers: Record<string, string> = {
+        'User-Agent': 'skillpkg',
+      };
+      if (token) {
+        headers['Authorization'] = `token ${token}`;
+      }
+
+      const response = await fetch(rawUrl, { headers });
 
       if (!response.ok) continue;
 
       const content = await response.text();
-      const parsed = parseFrontmatter(content);
+      const parsed = parseSkillMdFrontmatter(content);
 
       // Valid SKILL.md has frontmatter with name
       if (parsed && parsed.frontmatter.name) {
-        return { hasSkill: true, skillFile: path };
+        return { hasSkill: true, skillFile: path, content };
       }
     } catch {
       continue;
@@ -112,6 +122,24 @@ async function detectSkillMd(
 }
 
 /**
+ * Build an optimized search query for AI agent skills
+ */
+function buildSearchQuery(userQuery: string): string {
+  const queryLower = userQuery.toLowerCase();
+
+  // If user already included skill-related terms, use as-is
+  const skillTerms = ['skill', 'agent', 'prompt', 'ai', 'llm', 'claude', 'gpt', 'mcp'];
+  const hasSkillTerm = skillTerms.some((term) => queryLower.includes(term));
+
+  if (hasSkillTerm) {
+    return userQuery;
+  }
+
+  // Add context for better AI skill results
+  return `${userQuery} skill OR agent OR prompt`;
+}
+
+/**
  * Search for AI agent skills on GitHub
  */
 export async function searchGitHubSkills(
@@ -119,6 +147,7 @@ export async function searchGitHubSkills(
   options: GitHubSearchOptions = {}
 ): Promise<GitHubSkillResult[]> {
   const limit = options.limit || 20;
+  const token = options.token || process.env.GITHUB_TOKEN;
 
   // Build search query
   const searchQuery = buildSearchQuery(query);
@@ -126,15 +155,15 @@ export async function searchGitHubSkills(
   const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(searchQuery)}&sort=stars&order=desc&per_page=${limit}`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'skillpkg-mcp-server',
-        ...(process.env.GITHUB_TOKEN && {
-          Authorization: `token ${process.env.GITHUB_TOKEN}`,
-        }),
-      },
-    });
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'skillpkg',
+    };
+    if (token) {
+      headers['Authorization'] = `token ${token}`;
+    }
+
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
       if (response.status === 403) {
@@ -152,7 +181,7 @@ export async function searchGitHubSkills(
     const results: GitHubSkillResult[] = [];
 
     for (const item of data.items) {
-      const detection = await detectSkillMd(item.full_name);
+      const detection = await detectSkillMd(item.full_name, token);
 
       results.push({
         name: item.name,
@@ -186,46 +215,29 @@ export async function searchGitHubSkills(
 }
 
 /**
- * Build an optimized search query for AI agent skills
- */
-function buildSearchQuery(userQuery: string): string {
-  const queryLower = userQuery.toLowerCase();
-
-  // If user already included skill-related terms, use as-is
-  const skillTerms = ['skill', 'agent', 'prompt', 'ai', 'llm', 'claude', 'gpt', 'mcp'];
-  const hasSkillTerm = skillTerms.some((term) => queryLower.includes(term));
-
-  if (hasSkillTerm) {
-    return userQuery;
-  }
-
-  // Add context for better AI skill results
-  return `${userQuery} skill OR agent OR prompt`;
-}
-
-/**
  * Get skill info from a specific GitHub repository
  */
 export async function getGitHubSkillInfo(
-  repoFullName: string
+  repoFullName: string,
+  token?: string
 ): Promise<GitHubSkillResult | null> {
   try {
-    const response = await fetch(`https://api.github.com/repos/${repoFullName}`, {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'skillpkg-mcp-server',
-        ...(process.env.GITHUB_TOKEN && {
-          Authorization: `token ${process.env.GITHUB_TOKEN}`,
-        }),
-      },
-    });
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'skillpkg',
+    };
+    if (token || process.env.GITHUB_TOKEN) {
+      headers['Authorization'] = `token ${token || process.env.GITHUB_TOKEN}`;
+    }
+
+    const response = await fetch(`https://api.github.com/repos/${repoFullName}`, { headers });
 
     if (!response.ok) {
       return null;
     }
 
     const item = (await response.json()) as GitHubRepoSearchItem;
-    const detection = await detectSkillMd(item.full_name);
+    const detection = await detectSkillMd(item.full_name, token);
 
     return {
       name: item.name,
@@ -248,30 +260,37 @@ export async function getGitHubSkillInfo(
 /**
  * Fetch and parse SKILL.md content from a repository
  */
-export async function fetchSkillContent(
+export async function fetchSkillMdContent(
   repoFullName: string,
-  skillFile: string
-): Promise<{ name: string; description: string; instructions: string } | null> {
+  skillFile: string,
+  token?: string
+): Promise<{ name: string; description: string; version: string; instructions: string } | null> {
   const rawUrl = `https://raw.githubusercontent.com/${repoFullName}/HEAD/${skillFile}`;
 
   try {
-    const response = await fetch(rawUrl, {
-      headers: { 'User-Agent': 'skillpkg-mcp-server' },
-    });
+    const headers: Record<string, string> = {
+      'User-Agent': 'skillpkg',
+    };
+    if (token || process.env.GITHUB_TOKEN) {
+      headers['Authorization'] = `token ${token || process.env.GITHUB_TOKEN}`;
+    }
+
+    const response = await fetch(rawUrl, { headers });
 
     if (!response.ok) return null;
 
     const content = await response.text();
-    const parsed = parseFrontmatter(content);
+    const parsed = parseSkillMdFrontmatter(content);
 
     if (!parsed) return null;
 
     return {
-      name: (parsed.frontmatter.name as string) || '',
+      name: parsed.frontmatter.name || '',
       description:
-        (parsed.frontmatter.description as string) ||
+        parsed.frontmatter.description ||
         parsed.frontmatter.metadata?.['short-description'] ||
         '',
+      version: parsed.frontmatter.version || '1.0.0',
       instructions: parsed.body,
     };
   } catch {

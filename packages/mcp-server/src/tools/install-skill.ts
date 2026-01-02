@@ -8,8 +8,7 @@
 import type { ToolHandler, ToolResult, InstallSkillInput, InstallSkillOutput, SourceType } from '../types.js';
 import { getStore, successResult, errorResult, validateString, validateScope } from './utils.js';
 import { InvalidSourceError } from '../types.js';
-import { parse as parseSkillYaml } from 'skillpkg-core';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseSkillYaml, detectSkillMd, fetchSkillMdContent } from 'skillpkg-core';
 
 /**
  * Parse source string to determine source type
@@ -57,83 +56,33 @@ async function fetchSkillFromUrl(url: string): Promise<string> {
 }
 
 /**
- * Parse SKILL.md frontmatter (YAML between --- markers)
- */
-interface SkillMdFrontmatter {
-  name?: string;
-  description?: string;
-  version?: string;
-  'allowed-tools'?: string;
-  metadata?: {
-    'short-description'?: string;
-  };
-}
-
-function parseSkillMdFrontmatter(
-  content: string
-): { frontmatter: SkillMdFrontmatter; body: string } | null {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) {
-    return null;
-  }
-
-  try {
-    const frontmatter = parseYaml(match[1]) as SkillMdFrontmatter;
-    return { frontmatter, body: match[2] };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Fetch skill from GitHub repo (SKILL.md or skill.yaml)
+ * Uses shared logic from skillpkg-core
  */
 async function fetchSkillFromGitHub(repo: string): Promise<string> {
-  // Try SKILL.md first (industry standard), then fall back to skill.yaml
-  const skillMdPaths = [
-    'SKILL.md',
-    'skill.md',
-    'skills/SKILL.md',
-    'skills/skill.md',
-    '.claude/skills/skill.md',
-  ];
-  const skillYamlPaths = ['skill.yaml', 'skill.yml', '.claude/skill.yaml'];
-  const branches = ['main', 'master', 'HEAD'];
+  const token = process.env.GITHUB_TOKEN;
 
-  // Try SKILL.md first
-  for (const branch of branches) {
-    for (const path of skillMdPaths) {
-      const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
-      try {
-        const content = await fetchSkillFromUrl(url);
-        const parsed = parseSkillMdFrontmatter(content);
-        if (parsed && parsed.frontmatter.name) {
-          // Convert SKILL.md to skill.yaml format for compatibility
-          const skillYaml = {
-            schema: '1.0',
-            name: parsed.frontmatter.name,
-            version: parsed.frontmatter.version || '1.0.0',
-            description:
-              parsed.frontmatter.description ||
-              parsed.frontmatter.metadata?.['short-description'] ||
-              '',
-            instructions: parsed.body,
-          };
-          return `schema: "1.0"\nname: ${skillYaml.name}\nversion: ${skillYaml.version}\ndescription: ${JSON.stringify(skillYaml.description)}\ninstructions: |\n${parsed.body.split('\n').map((l) => '  ' + l).join('\n')}`;
-        }
-      } catch {
-        // Try next path/branch
-      }
+  // Try SKILL.md first using core's detection
+  const detection = await detectSkillMd(repo, token);
+
+  if (detection.hasSkill && detection.skillFile) {
+    const content = await fetchSkillMdContent(repo, detection.skillFile, token);
+    if (content) {
+      // Convert to skill.yaml format for compatibility
+      return `schema: "1.0"\nname: ${content.name}\nversion: ${content.version}\ndescription: ${JSON.stringify(content.description)}\ninstructions: |\n${content.instructions.split('\n').map((l) => '  ' + l).join('\n')}`;
     }
   }
 
   // Fall back to skill.yaml
+  const skillYamlPaths = ['skill.yaml', 'skill.yml', '.claude/skill.yaml'];
+  const branches = ['main', 'master', 'HEAD'];
+
   for (const branch of branches) {
     for (const path of skillYamlPaths) {
       const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
       try {
-        const content = await fetchSkillFromUrl(url);
-        return content;
+        const yamlContent = await fetchSkillFromUrl(url);
+        return yamlContent;
       } catch {
         // Try next path/branch
       }

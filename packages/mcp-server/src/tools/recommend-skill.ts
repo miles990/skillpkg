@@ -15,7 +15,7 @@ import type {
   RecommendCriteria,
 } from '../types.js';
 import { successResult, errorResult, validateString, calculateRelevanceScore } from './utils.js';
-import { searchGitHubSkills, type GitHubSkillResult } from './github-search.js';
+import { searchGitHubSkills, type GitHubSkillResult } from 'skillpkg-core';
 
 export function createRecommendSkillHandler(): ToolHandler {
   return {

@@ -1,20 +1,15 @@
 /**
- * search command - Search for skills in the registry
+ * search command - Search for skills on GitHub
+ *
+ * Uses GitHub API to find repositories with SKILL.md files.
+ * SKILL.md is the industry standard for Claude Code and OpenAI Codex.
  */
-import {
-  createRegistryClient,
-  RegistryError,
-  DEFAULT_REGISTRY_URL,
-} from 'skillpkg-core';
-import type { SearchOptions } from 'skillpkg-core';
+import { searchGitHubSkills } from 'skillpkg-core';
 import { logger, colors } from '../ui/index.js';
 
 interface SearchCommandOptions {
   limit?: string;
-  page?: string;
-  sort?: string;
   json?: boolean;
-  registry?: string;
 }
 
 /**
@@ -30,87 +25,84 @@ export async function searchCommand(
     process.exit(1);
   }
 
-  const client = createRegistryClient({
-    registryUrl: options.registry || DEFAULT_REGISTRY_URL,
-  });
-
-  logger.header('Search Skills');
+  logger.header('Search Skills on GitHub');
   logger.log(`Searching for: ${colors.cyan(query)}`);
   logger.blank();
 
   try {
-    const searchOptions: SearchOptions = {};
+    const limit = options.limit ? parseInt(options.limit, 10) : 20;
 
-    if (options.limit) {
-      searchOptions.limit = parseInt(options.limit, 10);
-    }
-    if (options.page) {
-      searchOptions.page = parseInt(options.page, 10);
-    }
-    if (options.sort) {
-      searchOptions.sort = options.sort as SearchOptions['sort'];
-    }
-
-    const result = await client.search(query, searchOptions);
+    const results = await searchGitHubSkills(query, { limit });
 
     // JSON output mode
     if (options.json) {
-      console.log(JSON.stringify(result, null, 2));
+      console.log(JSON.stringify(results, null, 2));
       return;
     }
 
-    if (result.results.length === 0) {
+    if (results.length === 0) {
       logger.warn('No skills found matching your query');
+      logger.log(colors.dim('Try different keywords or check GitHub directly.'));
       return;
     }
 
-    logger.log(`Found ${colors.cyan(String(result.total))} skill(s)`);
+    // Count skills with SKILL.md
+    const withSkillMd = results.filter((r) => r.hasSkill).length;
+    logger.log(
+      `Found ${colors.cyan(String(results.length))} repository(s)` +
+        (withSkillMd > 0 ? ` (${colors.green(String(withSkillMd))} with SKILL.md)` : '')
+    );
     logger.blank();
 
     // Display results
-    for (const item of result.results) {
+    for (const item of results) {
       const name = colors.cyan(item.name);
-      const version = colors.dim(`@${item.version}`);
-      const downloads = colors.dim(`(${formatDownloads(item.downloads)} downloads)`);
+      const hasSkill = item.hasSkill ? colors.green(' ✓ SKILL.md') : '';
+      const stars = colors.yellow(`⭐${formatNumber(item.stars)}`);
 
-      logger.log(`${name}${version} ${downloads}`);
+      logger.log(`${name}${hasSkill} ${stars}`);
+      logger.log(`  ${colors.dim(item.fullName)}`);
       if (item.description) {
-        logger.log(`  ${colors.dim(item.description)}`);
+        logger.log(`  ${item.description}`);
       }
-      if (item.keywords && item.keywords.length > 0) {
-        logger.log(`  ${colors.dim('Keywords:')} ${item.keywords.join(', ')}`);
+      if (item.topics && item.topics.length > 0) {
+        logger.log(`  ${colors.dim('Topics:')} ${item.topics.slice(0, 5).join(', ')}`);
+      }
+      if (item.installSource) {
+        logger.log(`  ${colors.dim('Install:')} skillpkg install ${item.installSource}`);
       }
       logger.blank();
     }
 
-    // Pagination info
-    const totalPages = Math.ceil(result.total / result.limit);
-    if (totalPages > 1) {
+    // Tip
+    if (withSkillMd === 0) {
       logger.log(
-        colors.dim(`Page ${result.page} of ${totalPages}. `) +
-          colors.dim(`Use --page to navigate.`)
+        colors.dim(
+          'Tip: Repositories with SKILL.md can be installed directly. ' +
+            'Others may require manual setup.'
+        )
       );
     }
   } catch (error) {
-    if (error instanceof RegistryError) {
-      if (error.code === 'NETWORK_ERROR') {
-        logger.error('Unable to connect to registry');
-        logger.log(`Registry URL: ${colors.dim(client.getRegistryUrl())}`);
-        logger.log('Check your network connection or try again later.');
-      } else {
-        logger.error(`Registry error: ${error.message}`);
-      }
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (message.includes('rate limit')) {
+      logger.error('GitHub API rate limit exceeded');
+      logger.log(
+        colors.dim('Set GITHUB_TOKEN environment variable for higher limits:')
+      );
+      logger.log(colors.dim('  export GITHUB_TOKEN=your_token_here'));
     } else {
-      logger.error(`Search failed: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Search failed: ${message}`);
     }
     process.exit(1);
   }
 }
 
 /**
- * Format download count for display
+ * Format number for display (1000 -> 1K, 1000000 -> 1M)
  */
-function formatDownloads(count: number): string {
+function formatNumber(count: number): string {
   if (count >= 1000000) {
     return `${(count / 1000000).toFixed(1)}M`;
   }
