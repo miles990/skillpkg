@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/skillpkg-v2/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-01-02T17:59:54.298Z",
+      "trigger": "initial",
+      "approvalId": "approval_1767376794286_zocz8l8mn",
+      "approvalTitle": "Requirements: skillpkg v2.0 需求規格"
+    }
+  ]
+}

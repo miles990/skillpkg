@@ -1,12 +1,12 @@
 /**
- * init command - Create a new skill.yaml
+ * init command - Initialize a skillpkg project
+ *
+ * v2.0: Creates skillpkg.json for project configuration
+ * For creating skills, use SKILL.md format directly
  */
-import { existsSync } from 'fs';
-import { writeFile } from 'fs/promises';
-import { join, basename } from 'path';
+import { basename } from 'path';
 import inquirer from 'inquirer';
-import { stringify } from 'skillpkg-core';
-import type { Skill } from 'skillpkg-core';
+import { createConfigManager, type SkillpkgConfig } from 'skillpkg-core';
 import { logger, colors, withSpinner } from '../ui/index.js';
 
 interface InitOptions {
@@ -15,40 +15,32 @@ interface InitOptions {
 }
 
 /**
- * Default skill template
+ * Get default project name from directory
  */
-function getDefaultSkill(name: string): Skill {
-  return {
-    schema: '1.0',
-    name,
-    version: '1.0.0',
-    description: 'A skillpkg skill',
-    instructions: `# ${name}
-
-## Overview
-
-Describe what this skill does.
-
-## Usage
-
-Explain how to use this skill.
-
-## Examples
-
-Provide usage examples.
-`,
-  };
+function getDefaultProjectName(): string {
+  const dirName = basename(process.cwd());
+  return toKebabCase(dirName) || 'my-project';
 }
 
 /**
- * Validate skill name
+ * Convert string to kebab-case
+ */
+function toKebabCase(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Validate project name
  */
 function validateName(input: string): boolean | string {
   if (!input) {
     return 'Name is required';
   }
-  if (!/^[a-z][a-z0-9-]*[a-z0-9]$/.test(input)) {
-    return 'Name must be kebab-case (e.g., my-skill)';
+  if (!/^[a-z][a-z0-9-]*[a-z0-9]$/.test(input) && input.length >= 2) {
+    return 'Name must be kebab-case (e.g., my-project)';
   }
   if (input.length < 2 || input.length > 100) {
     return 'Name must be between 2 and 100 characters';
@@ -61,116 +53,97 @@ function validateName(input: string): boolean | string {
  */
 export async function initCommand(options: InitOptions): Promise<void> {
   const cwd = process.cwd();
-  const skillPath = join(cwd, 'skill.yaml');
+  const configManager = createConfigManager();
 
-  // Check if skill.yaml already exists
-  if (existsSync(skillPath)) {
-    logger.error('skill.yaml already exists in this directory');
+  // Check if skillpkg.json already exists
+  const existingConfig = await configManager.loadProjectConfig(cwd);
+  if (existingConfig) {
+    logger.error('skillpkg.json already exists in this directory');
+    logger.log(`Use ${colors.cyan('skillpkg install <skill>')} to add skills`);
     process.exit(1);
   }
 
-  let skill: Skill;
+  let config: SkillpkgConfig;
 
   if (options.yes) {
     // Quick mode - use defaults
-    const defaultName = options.name || toKebabCase(basename(cwd)) || 'my-skill';
-    skill = getDefaultSkill(defaultName);
-    logger.info(`Creating skill.yaml with defaults (name: ${colors.cyan(defaultName)})`);
+    const projectName = options.name || getDefaultProjectName();
+    config = {
+      $schema: 'https://skillpkg.dev/schemas/skillpkg.json',
+      name: projectName,
+      skills: {},
+      sync_targets: {
+        'claude-code': true,
+      },
+    };
+    logger.info(`Creating skillpkg.json with defaults (name: ${colors.cyan(projectName)})`);
   } else {
     // Interactive mode
-    logger.header('Create a new skill');
+    logger.header('Initialize skillpkg project');
+    logger.blank();
 
     const answers = await inquirer.prompt([
       {
         type: 'input',
         name: 'name',
-        message: 'Skill name:',
-        default: options.name || toKebabCase(basename(cwd)) || 'my-skill',
+        message: 'Project name:',
+        default: options.name || getDefaultProjectName(),
         validate: validateName,
       },
       {
-        type: 'input',
-        name: 'version',
-        message: 'Version:',
-        default: '1.0.0',
-        validate: (input: string) => {
-          if (!/^\d+\.\d+\.\d+/.test(input)) {
-            return 'Version must be semver (e.g., 1.0.0)';
-          }
-          return true;
-        },
-      },
-      {
-        type: 'input',
-        name: 'description',
-        message: 'Description:',
-        default: 'A skillpkg skill',
-      },
-      {
-        type: 'input',
-        name: 'author',
-        message: 'Author:',
-      },
-      {
         type: 'checkbox',
-        name: 'platforms',
-        message: 'Target platforms:',
+        name: 'syncTargets',
+        message: 'Enable sync targets:',
         choices: [
-          { name: 'Claude Code', value: 'claude-code', checked: true },
-          { name: 'Codex (OpenAI)', value: 'codex' },
-          { name: 'GitHub Copilot', value: 'copilot' },
-          { name: 'Cline (VS Code)', value: 'cline' },
+          { name: 'Claude Code (.claude/skills/)', value: 'claude-code', checked: true },
+          { name: 'Codex (.codex/skills/)', value: 'codex' },
+          { name: 'GitHub Copilot (.github/)', value: 'copilot' },
+          { name: 'Cline (.cline/)', value: 'cline' },
         ],
       },
     ]);
 
-    skill = {
-      schema: '1.0',
+    // Build sync_targets object
+    const syncTargets: Record<string, boolean> = {};
+    for (const target of answers.syncTargets) {
+      syncTargets[target] = true;
+    }
+
+    config = {
+      $schema: 'https://skillpkg.dev/schemas/skillpkg.json',
       name: answers.name,
-      version: answers.version,
-      description: answers.description,
-      ...(answers.author && { author: answers.author }),
-      ...(answers.platforms?.length > 0 && {
-        platforms: Object.fromEntries(answers.platforms.map((p: string) => [p, {}])),
-      }),
-      instructions: `# ${answers.name}
-
-## Overview
-
-${answers.description}
-
-## Usage
-
-Explain how to use this skill.
-
-## Examples
-
-Provide usage examples.
-`,
+      skills: {},
+      sync_targets: syncTargets,
     };
   }
 
-  // Write skill.yaml
-  await withSpinner('Creating skill.yaml', async () => {
-    const content = stringify(skill);
-    await writeFile(skillPath, content, 'utf-8');
+  // Initialize project
+  await withSpinner('Creating skillpkg.json', async () => {
+    await configManager.initProject(cwd, config.name);
+
+    // Update with full config (including sync_targets)
+    const loaded = await configManager.loadProjectConfig(cwd);
+    if (loaded) {
+      loaded.sync_targets = config.sync_targets;
+      await configManager.saveProjectConfig(cwd, loaded);
+    }
   });
 
   logger.blank();
-  logger.success(`Created ${colors.cyan('skill.yaml')}`);
+  logger.success(`Created ${colors.cyan('skillpkg.json')}`);
   logger.blank();
+
+  // Show what was created
+  logger.log('Configuration:');
+  logger.item(`Name: ${colors.cyan(config.name)}`);
+  if (Object.keys(config.sync_targets || {}).length > 0) {
+    logger.item(`Sync targets: ${colors.cyan(Object.keys(config.sync_targets || {}).join(', '))}`);
+  }
+  logger.blank();
+
   logger.log('Next steps:');
-  logger.item(`Edit ${colors.cyan('skill.yaml')} to customize your skill`);
+  logger.item(`Run ${colors.cyan('skillpkg install <skill>')} to install skills`);
+  logger.item(`Run ${colors.cyan('skillpkg search <query>')} to find skills`);
   logger.item(`Run ${colors.cyan('skillpkg sync')} to sync to platforms`);
   logger.blank();
-}
-
-/**
- * Convert string to kebab-case
- */
-function toKebabCase(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
 }

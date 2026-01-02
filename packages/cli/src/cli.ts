@@ -13,17 +13,19 @@ import { searchCommand } from './commands/search.js';
 import { infoCommand } from './commands/info.js';
 import { loginCommand, logoutCommand, whoamiCommand } from './commands/login.js';
 import { publishCommand } from './commands/publish.js';
+import { depsCommand, whyCommand, treeCommand } from './commands/deps.js';
+import { statusCommand } from './commands/status.js';
 
 /**
  * Register all CLI commands
  */
 export function registerCommands(program: Command): void {
-  // init - Create a new skill.yaml
+  // init - Initialize a skillpkg project
   program
     .command('init')
-    .description('Create a new skill.yaml file')
+    .description('Initialize a skillpkg project (create skillpkg.json)')
     .option('-y, --yes', 'Use default values without prompts')
-    .option('-n, --name <name>', 'Skill name')
+    .option('-n, --name <name>', 'Project name')
     .action(initCommand);
 
   // install - Install a skill
@@ -51,6 +53,7 @@ export function registerCommands(program: Command): void {
     .description('Uninstall a skill')
     .option('-g, --global', 'Uninstall from global store')
     .option('-c, --clean', 'Also remove synced files from all platforms')
+    .option('-f, --force', 'Force uninstall even if other skills depend on it')
     .action(uninstallCommand);
 
   // sync - Sync skills to platforms
@@ -132,4 +135,32 @@ export function registerCommands(program: Command): void {
     .option('--registry <url>', 'Registry URL')
     .option('--dry-run', 'Show what would be published without publishing')
     .action(publishCommand);
+
+  // deps - Show dependencies of a skill
+  program
+    .command('deps <skill>')
+    .description('Show dependencies of a skill')
+    .option('--json', 'Output as JSON')
+    .action(depsCommand);
+
+  // why - Show why a skill is installed
+  program
+    .command('why <skill>')
+    .description('Show why a skill is installed (dependency chain)')
+    .option('--json', 'Output as JSON')
+    .action(whyCommand);
+
+  // tree - Show full dependency tree
+  program
+    .command('tree')
+    .description('Show full dependency tree of installed skills')
+    .option('--json', 'Output as JSON')
+    .action(treeCommand);
+
+  // status - Show project status
+  program
+    .command('status')
+    .description('Show overall project status (skills, MCP, sync)')
+    .option('--json', 'Output as JSON')
+    .action(statusCommand);
 }

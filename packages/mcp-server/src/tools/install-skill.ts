@@ -1,44 +1,46 @@
 /**
  * Tool: install_skill
  *
- * Installs a skill from GitHub, Gist, URL, or local path.
- * Supports SKILL.md format (industry standard for Claude Code and OpenAI Codex).
+ * v2.0: Uses new Installer module with dependency resolution.
+ * Returns dependency info and MCP requirements.
  */
 
-import type { ToolHandler, ToolResult, InstallSkillInput, InstallSkillOutput, SourceType } from '../types.js';
+import type { ToolHandler, ToolResult, InstallSkillInput } from '../types.js';
 import { getStore, successResult, errorResult, validateString, validateScope } from './utils.js';
 import { InvalidSourceError } from '../types.js';
-import { parse as parseSkillYaml, detectSkillMd, fetchSkillMdContent } from 'skillpkg-core';
+import {
+  parse as parseSkillYaml,
+  detectSkillMd,
+  fetchSkillMdContent,
+  createInstaller,
+  createStateManager,
+  createConfigManager,
+  type Skill,
+  type SkillFetcherAdapter,
+} from 'skillpkg-core';
 
 /**
  * Parse source string to determine source type
  */
+type SourceType = 'github' | 'gist' | 'url' | 'local';
+
 function parseSource(source: string): { type: SourceType; value: string } {
-  // GitHub: github:user/repo or user/repo
   if (source.startsWith('github:')) {
     return { type: 'github', value: source.slice(7) };
   }
   if (/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/.test(source)) {
     return { type: 'github', value: source };
   }
-
-  // Gist: gist:id
   if (source.startsWith('gist:')) {
     return { type: 'gist', value: source.slice(5) };
   }
-
-  // URL: https:// or http://
   if (source.startsWith('https://') || source.startsWith('http://')) {
     return { type: 'url', value: source };
   }
-
-  // Local path: starts with ./ or / or contains path separators
   if (source.startsWith('./') || source.startsWith('/') || source.startsWith('../')) {
     return { type: 'local', value: source };
   }
 
-  // Simple skill names are no longer supported (no central registry)
-  // Suggest using github:owner/repo format instead
   throw new InvalidSourceError(
     `Invalid source "${source}". Use one of: github:owner/repo, gist:id, https://url, or ./local/path`
   );
@@ -56,20 +58,23 @@ async function fetchSkillFromUrl(url: string): Promise<string> {
 }
 
 /**
- * Fetch skill from GitHub repo (SKILL.md or skill.yaml)
- * Uses shared logic from skillpkg-core
+ * Fetch skill from GitHub repo
  */
-async function fetchSkillFromGitHub(repo: string): Promise<string> {
+async function fetchSkillFromGitHub(repo: string): Promise<Skill | null> {
   const token = process.env.GITHUB_TOKEN;
 
-  // Try SKILL.md first using core's detection
   const detection = await detectSkillMd(repo, token);
 
   if (detection.hasSkill && detection.skillFile) {
     const content = await fetchSkillMdContent(repo, detection.skillFile, token);
     if (content) {
-      // Convert to skill.yaml format for compatibility
-      return `schema: "1.0"\nname: ${content.name}\nversion: ${content.version}\ndescription: ${JSON.stringify(content.description)}\ninstructions: |\n${content.instructions.split('\n').map((l) => '  ' + l).join('\n')}`;
+      return {
+        schema: '1.0',
+        name: content.name,
+        version: content.version,
+        description: content.description,
+        instructions: content.instructions,
+      };
     }
   }
 
@@ -82,20 +87,23 @@ async function fetchSkillFromGitHub(repo: string): Promise<string> {
       const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
       try {
         const yamlContent = await fetchSkillFromUrl(url);
-        return yamlContent;
+        const result = parseSkillYaml(yamlContent);
+        if (result.success && result.data) {
+          return result.data;
+        }
       } catch {
-        // Try next path/branch
+        // Try next
       }
     }
   }
 
-  throw new Error(`Could not find SKILL.md or skill.yaml in repository ${repo}`);
+  return null;
 }
 
 /**
  * Fetch skill from Gist
  */
-async function fetchSkillFromGist(gistId: string): Promise<string> {
+async function fetchSkillFromGist(gistId: string): Promise<Skill | null> {
   const apiUrl = `https://api.github.com/gists/${gistId}`;
   const response = await fetch(apiUrl);
 
@@ -107,60 +115,140 @@ async function fetchSkillFromGist(gistId: string): Promise<string> {
     files: Record<string, { content: string; filename: string }>;
   };
 
-  // Look for skill.yaml or skill.yml
   for (const [filename, file] of Object.entries(gist.files)) {
     if (filename === 'skill.yaml' || filename === 'skill.yml') {
-      return file.content;
+      const result = parseSkillYaml(file.content);
+      if (result.success && result.data) {
+        return result.data;
+      }
     }
   }
 
-  throw new Error(`No skill.yaml found in gist ${gistId}`);
+  return null;
 }
 
 /**
  * Fetch skill from local path
  */
-async function fetchSkillFromLocal(path: string): Promise<string> {
+async function fetchSkillFromLocal(path: string): Promise<Skill | null> {
   const fs = await import('fs/promises');
   const nodePath = await import('path');
 
   let skillPath = path;
-  const stat = await fs.stat(path);
 
-  if (stat.isDirectory()) {
-    // Look for skill.yaml in directory
-    const candidates = ['skill.yaml', 'skill.yml'];
-    for (const candidate of candidates) {
-      const fullPath = nodePath.join(path, candidate);
-      try {
-        await fs.access(fullPath);
-        skillPath = fullPath;
-        break;
-      } catch {
-        // Try next
+  try {
+    const stat = await fs.stat(path);
+
+    if (stat.isDirectory()) {
+      const candidates = ['SKILL.md', 'skill.yaml', 'skill.yml'];
+      for (const candidate of candidates) {
+        const fullPath = nodePath.join(path, candidate);
+        try {
+          await fs.access(fullPath);
+          skillPath = fullPath;
+          break;
+        } catch {
+          // Try next
+        }
       }
     }
+
+    const content = await fs.readFile(skillPath, 'utf-8');
+
+    // Check if SKILL.md format
+    if (skillPath.endsWith('.md')) {
+      const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+      if (match) {
+        const { parse: parseYaml } = await import('yaml');
+        const frontmatter = parseYaml(match[1]);
+        return {
+          schema: '1.0',
+          name: frontmatter.name,
+          version: frontmatter.version || '1.0.0',
+          description: frontmatter.description || '',
+          instructions: match[2],
+          dependencies: frontmatter.dependencies,
+        };
+      }
+    }
+
+    // Parse as YAML
+    const result = parseSkillYaml(content);
+    if (result.success && result.data) {
+      return result.data;
+    }
+  } catch {
+    return null;
   }
 
-  return fs.readFile(skillPath, 'utf-8');
+  return null;
+}
+
+/**
+ * Create a SkillFetcherAdapter
+ */
+function createFetcher(): SkillFetcherAdapter {
+  return {
+    async fetchMetadata(source: string) {
+      const skill = await fetchSkillBySource(source);
+      if (!skill) return null;
+      return {
+        name: skill.name,
+        version: skill.version,
+        dependencies: skill.dependencies,
+      };
+    },
+    async fetchSkill(source: string) {
+      return fetchSkillBySource(source);
+    },
+  };
+}
+
+async function fetchSkillBySource(source: string): Promise<Skill | null> {
+  try {
+    const { type, value } = parseSource(source);
+
+    switch (type) {
+      case 'github':
+        return fetchSkillFromGitHub(value);
+      case 'gist':
+        return fetchSkillFromGist(value);
+      case 'url': {
+        const content = await fetchSkillFromUrl(value);
+        const result = parseSkillYaml(content);
+        return result.success && result.data ? result.data : null;
+      }
+      case 'local':
+        return fetchSkillFromLocal(value);
+    }
+  } catch {
+    return null;
+  }
 }
 
 export function createInstallSkillHandler(): ToolHandler {
   return {
     name: 'install_skill',
-    description: `Install a skill from various sources. Supports SKILL.md format (industry standard for Claude Code and OpenAI Codex).
+    description: `Install a skill from various sources with dependency resolution.
+
+Supports SKILL.md format (industry standard for Claude Code and OpenAI Codex).
 
 Supported source formats:
 • GitHub: github:user/repo or user/repo (e.g., "anthropics/claude-code-skills")
 • Gist: gist:id (e.g., "gist:abc123")
 • URL: https://... (direct link to SKILL.md or skill.yaml)
-• Local: ./path or /absolute/path (local file or directory)`,
+• Local: ./path or /absolute/path (local file or directory)
+
+Returns:
+• List of installed skills (including dependencies)
+• MCP servers required by the skill
+• Suggestions for next steps`,
     inputSchema: {
       type: 'object',
       properties: {
         source: {
           type: 'string',
-          description: 'Source to install from: skill-name, github:user/repo, gist:id, URL, or local path',
+          description: 'Source to install from: github:user/repo, gist:id, URL, or local path',
         },
         scope: {
           type: 'string',
@@ -179,84 +267,77 @@ Supported source formats:
         const sourceStr = validateString(input.source, 'source');
         const scope = validateScope(input.scope, 'local');
 
-        // Parse the source
+        // Normalize source
         const { type, value } = parseSource(sourceStr);
+        const normalizedSource = type === 'github' ? `github:${value}` : sourceStr;
 
-        // Fetch skill content based on source type
-        let skillContent: string;
+        // Get project path (cwd for MCP server context)
+        const cwd = process.cwd();
 
-        switch (type) {
-          case 'github':
-            skillContent = await fetchSkillFromGitHub(value);
-            break;
+        // Create installer
+        const stateManager = createStateManager();
+        const configManager = createConfigManager();
+        const storeManager = getStore(scope);
+        const fetcher = createFetcher();
 
-          case 'gist':
-            skillContent = await fetchSkillFromGist(value);
-            break;
-
-          case 'url':
-            skillContent = await fetchSkillFromUrl(value);
-            break;
-
-          case 'local':
-            skillContent = await fetchSkillFromLocal(value);
-            break;
+        // Initialize store if needed
+        if (!(await storeManager.isInitialized())) {
+          await storeManager.init();
         }
 
-        // Parse the skill content
-        const parseResult = parseSkillYaml(skillContent);
-        if (!parseResult.success || !parseResult.data) {
-          const errors = parseResult.errors?.map((e) => e.message).join(', ') || 'Unknown parse error';
-          return errorResult(`Invalid skill.yaml: ${errors}`);
+        const installer = createInstaller(stateManager, configManager, storeManager, fetcher);
+
+        // Run installation
+        const result = await installer.install(cwd, normalizedSource);
+
+        if (!result.success) {
+          const errors = result.errors.join('; ');
+          return errorResult(`Installation failed: ${errors}`);
         }
 
-        const skill = parseResult.data;
+        // Build response
+        const installed = result.skills.filter((s) => s.action === 'installed');
+        const updated = result.skills.filter((s) => s.action === 'updated');
+        const skipped = result.skills.filter((s) => s.action === 'skipped');
 
-        // Get the store and initialize if needed
-        const store = getStore(scope);
-        if (!(await store.isInitialized())) {
-          await store.init();
+        const lines: string[] = [];
+
+        if (installed.length > 0) {
+          lines.push(`✅ Installed ${installed.length} skill(s):`);
+          for (const skill of installed) {
+            const note = skill.transitive ? ` (dependency of ${skill.requiredBy})` : '';
+            lines.push(`   • ${skill.name} v${skill.version}${note}`);
+          }
         }
 
-        // Check if already installed
-        if (await store.hasSkill(skill.name)) {
-          // Update instead of error
-          await store.updateSkill(skill.name, skill);
-
-          const output: InstallSkillOutput = {
-            success: true,
-            skill: {
-              id: `${scope}:${skill.name}`,
-              name: skill.name,
-              version: skill.version,
-              source: sourceStr,
-              installedAt: new Date().toISOString(),
-            },
-            message: `Updated "${skill.name}" to v${skill.version} in ${scope} scope.`,
-          };
-
-          return successResult(output.message);
+        if (updated.length > 0) {
+          lines.push(`🔄 Updated ${updated.length} skill(s):`);
+          for (const skill of updated) {
+            lines.push(`   • ${skill.name} v${skill.version}`);
+          }
         }
 
-        // Add the skill
-        await store.addSkill(skill, {
-          source: type === 'local' ? 'local' : 'import',
-          sourceUrl: sourceStr,
-        });
+        if (skipped.length > 0) {
+          lines.push(`⏭️  Skipped ${skipped.length} already installed skill(s)`);
+        }
 
-        const output: InstallSkillOutput = {
-          success: true,
-          skill: {
-            id: `${scope}:${skill.name}`,
-            name: skill.name,
-            version: skill.version,
-            source: sourceStr,
-            installedAt: new Date().toISOString(),
-          },
-          message: `Successfully installed "${skill.name}" v${skill.version} to ${scope} scope.`,
-        };
+        // MCP requirements
+        if (result.mcpRequired.length > 0) {
+          lines.push('');
+          lines.push('⚠️  MCP servers required:');
+          for (const mcp of result.mcpRequired) {
+            lines.push(`   • ${mcp}`);
+          }
+          lines.push('   Configure these in your skillpkg.json or install manually.');
+        }
 
-        return successResult(output.message);
+        // Next steps
+        lines.push('');
+        lines.push('📋 Next steps:');
+        lines.push('   • Run `skillpkg sync` to sync to AI platforms');
+        lines.push('   • Run `skillpkg tree` to see dependency tree');
+
+        return successResult(lines.join('\n'));
       } catch (error) {
         if (error instanceof InvalidSourceError) {
           return errorResult(error.message);

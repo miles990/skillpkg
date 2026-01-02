@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/skillpkg-v2/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-01-02T18:05:06.836Z",
+      "trigger": "initial",
+      "approvalId": "approval_1767377106830_3q4w7tap0",
+      "approvalTitle": "Design: skillpkg v2.0 架構設計"
+    }
+  ]
+}

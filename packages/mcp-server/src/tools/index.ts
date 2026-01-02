@@ -15,6 +15,7 @@ import { createInstallSkillHandler } from './install-skill.js';
 import { createUninstallSkillHandler } from './uninstall-skill.js';
 import { createSkillInfoHandler } from './skill-info.js';
 import { createRecommendSkillHandler } from './recommend-skill.js';
+import { createSyncSkillsHandler } from './sync-skills.js';
 
 /**
  * Create all tool handlers
@@ -26,6 +27,7 @@ export function createAllToolHandlers(): ToolHandler[] {
     createLoadSkillHandler(),
     createInstallSkillHandler(),
     createUninstallSkillHandler(),
+    createSyncSkillsHandler(),
 
     // Search & Discovery
     createSearchSkillsHandler(),
@@ -41,6 +43,7 @@ export {
   createSearchSkillsHandler,
   createInstallSkillHandler,
   createUninstallSkillHandler,
+  createSyncSkillsHandler,
   createSkillInfoHandler,
   createRecommendSkillHandler,
 };

@@ -8,8 +8,8 @@
 | M2 | Dependency Resolution | 4 | [x] |
 | M3 | Sync Mechanism | 5 | [x] |
 | M4 | Installer Updates | 4 | [x] |
-| M5 | CLI Commands | 5 | [ ] |
-| M6 | MCP Server Updates | 3 | [ ] |
+| M5 | CLI Commands | 5 | [x] |
+| M6 | MCP Server Updates | 3 | [x] |
 | M7 | Migration & Polish | 4 | [ ] |
 
 ---
@@ -190,35 +190,35 @@
 
 ### Tasks
 
-- [ ] 5.1 新增 `skillpkg init` 命令
+- [x] 5.1 新增 `skillpkg init` 命令
   - 互動式建立 skillpkg.json
   - 詢問專案名稱
   - 詢問要啟用的 sync targets
 
-- [ ] 5.2 新增 `skillpkg sync` 命令
+- [x] 5.2 新增 `skillpkg sync` 命令
   - `skillpkg sync` - 同步到所有目標
   - `skillpkg sync <target>` - 同步到特定目標
   - `--dry-run` 預覽模式
 
-- [ ] 5.3 新增依賴相關命令
+- [x] 5.3 新增依賴相關命令
   - `skillpkg deps <name>` - 顯示 skill 的依賴
   - `skillpkg why <name>` - 顯示誰依賴此 skill
   - `skillpkg tree` - 顯示完整依賴樹
 
-- [ ] 5.4 新增 `skillpkg status` 命令
+- [x] 5.4 新增 `skillpkg status` 命令
   - 顯示安裝的 skills
   - 顯示 MCP 狀態
   - 顯示同步狀態
 
-- [ ] 5.5 更新現有命令
+- [x] 5.5 更新現有命令
   - `install` 加入依賴解析輸出
   - `uninstall` 加入依賴檢查
   - `list` 加入依賴標示
 
 ### 驗收標準
-- [ ] 所有命令可執行
-- [ ] 幫助文字清晰
-- [ ] 錯誤訊息友善
+- [x] 所有命令可執行
+- [x] 幫助文字清晰
+- [x] 錯誤訊息友善
 
 ---
 
@@ -228,23 +228,23 @@
 
 ### Tasks
 
-- [ ] 6.1 更新 install_skill tool
+- [x] 6.1 更新 install_skill tool
   - 返回依賴資訊
   - 返回需要的 MCP
   - 提示同步
 
-- [ ] 6.2 更新 uninstall_skill tool
+- [x] 6.2 更新 uninstall_skill tool
   - 檢查依賴者
   - 返回警告
   - 支援 force 參數
 
-- [ ] 6.3 新增 sync tool
+- [x] 6.3 新增 sync tool
   - `sync_skills` - 同步到指定目標
   - 返回同步結果
 
 ### 驗收標準
-- [ ] MCP tools 反映新功能
-- [ ] 返回值包含依賴資訊
+- [x] MCP tools 反映新功能
+- [x] 返回值包含依賴資訊
 
 ---
 

@@ -1,5 +1,7 @@
 /**
- * install command - Install a skill
+ * install command - Install a skill with dependency resolution
+ *
+ * v2.0: Uses new Installer module with dependency tracking
  *
  * Supports:
  * - Local path: skillpkg install ./path/to/skill
@@ -12,18 +14,22 @@ import { join, resolve, isAbsolute } from 'path';
 import { createGunzip } from 'zlib';
 import {
   parse,
-  createGlobalStore,
+  createInstaller,
+  createStateManager,
+  createConfigManager,
   createLocalStore,
+  createGlobalStore,
   detectSkillMd,
   fetchSkillMdContent,
-  SKILL_MD_PATHS,
+  type Skill,
+  type SkillFetcherAdapter,
 } from 'skillpkg-core';
-import type { Skill } from 'skillpkg-core';
 import { logger, colors, withSpinner } from '../ui/index.js';
 import * as tar from 'tar-stream';
 
 interface InstallOptions {
   global?: boolean;
+  registry?: string;
 }
 
 /**
@@ -56,47 +62,206 @@ export async function installCommand(
   skillArg: string | undefined,
   options: InstallOptions
 ): Promise<void> {
-  // If no skill argument, try to install from current directory
+  const cwd = process.cwd();
+
+  // If no skill argument, install from skillpkg.json
   if (!skillArg) {
-    const localSkillPath = join(process.cwd(), 'skill.yaml');
-    const localSkillMdPath = join(process.cwd(), 'SKILL.md');
-    if (existsSync(localSkillPath) || existsSync(localSkillMdPath)) {
-      skillArg = '.';
-    } else {
-      logger.error('No skill specified and no skill.yaml/SKILL.md found in current directory');
-      logger.log(`Usage: ${colors.cyan('skillpkg install <skill>')}`);
-      logger.blank();
-      logger.log('Examples:');
-      logger.item(`${colors.cyan('skillpkg install ./path/to/skill')} - Install from local path`);
-      logger.item(`${colors.cyan('skillpkg install github:user/repo')} - Install from GitHub`);
-      logger.item(`${colors.cyan('skillpkg install user/repo')} - Install from GitHub (shorthand)`);
-      process.exit(1);
-    }
+    await installFromConfig(cwd, options);
+    return;
   }
 
   const { type, value } = parseSource(skillArg);
+  const source = type === 'github' ? `github:${value}` : value;
+
+  // Create installer with fetcher
+  const stateManager = createStateManager();
+  const configManager = createConfigManager();
+  const storeManager = options.global ? createGlobalStore() : createLocalStore();
+  const fetcher = createFetcher();
+
+  // Initialize store if needed
+  if (!(await storeManager.isInitialized())) {
+    await withSpinner('Initializing store', () => storeManager.init());
+  }
+
+  const installer = createInstaller(stateManager, configManager, storeManager, fetcher);
+
+  logger.info(`Installing from ${colors.cyan(skillArg)}`);
+  logger.blank();
+
+  // Run installation
+  const result = await withSpinner('Resolving dependencies', async () => {
+    return installer.install(cwd, source);
+  });
+
+  // Show results
+  logger.blank();
+
+  if (!result.success) {
+    logger.error('Installation failed:');
+    for (const error of result.errors) {
+      logger.log(`  ${colors.red('×')} ${error}`);
+    }
+    process.exit(1);
+  }
+
+  // Show installed skills
+  const installed = result.skills.filter((s) => s.action === 'installed');
+  const updated = result.skills.filter((s) => s.action === 'updated');
+  const skipped = result.skills.filter((s) => s.action === 'skipped');
+
+  if (installed.length > 0) {
+    logger.success(`Installed ${installed.length} skill(s):`);
+    for (const skill of installed) {
+      const transitiveNote = skill.transitive
+        ? colors.dim(` (dependency of ${skill.requiredBy})`)
+        : '';
+      logger.item(`${colors.cyan(skill.name)} ${colors.dim(`v${skill.version}`)}${transitiveNote}`);
+    }
+  }
+
+  if (updated.length > 0) {
+    logger.log(`Updated ${updated.length} skill(s):`);
+    for (const skill of updated) {
+      logger.item(`${colors.cyan(skill.name)} ${colors.dim(`v${skill.version}`)}`);
+    }
+  }
+
+  if (skipped.length > 0) {
+    logger.log(colors.dim(`Skipped ${skipped.length} already installed skill(s)`));
+  }
+
+  // Show MCP requirements
+  if (result.mcpRequired.length > 0) {
+    logger.blank();
+    logger.warn('MCP servers required:');
+    for (const mcp of result.mcpRequired) {
+      logger.item(`${colors.yellow(mcp)}`);
+    }
+    logger.log(colors.dim('Configure these in your skillpkg.json or install manually.'));
+  }
+
+  logger.blank();
+  logger.log('Next steps:');
+  logger.item(`Run ${colors.cyan('skillpkg sync')} to sync to platforms`);
+  logger.item(`Run ${colors.cyan('skillpkg tree')} to see dependency tree`);
+  logger.blank();
+}
+
+/**
+ * Install all skills from skillpkg.json
+ */
+async function installFromConfig(cwd: string, options: InstallOptions): Promise<void> {
+  const configManager = createConfigManager();
+  const config = await configManager.loadProjectConfig(cwd);
+
+  if (!config) {
+    logger.error('No skillpkg.json found');
+    logger.log(`Run ${colors.cyan('skillpkg init')} to create one`);
+    logger.blank();
+    logger.log('Or specify a skill to install:');
+    logger.item(`${colors.cyan('skillpkg install ./path/to/skill')} - Install from local path`);
+    logger.item(`${colors.cyan('skillpkg install github:user/repo')} - Install from GitHub`);
+    process.exit(1);
+  }
+
+  const skills = Object.keys(config.skills || {});
+  if (skills.length === 0) {
+    logger.warn('No skills defined in skillpkg.json');
+    logger.log(`Add skills using ${colors.cyan('skillpkg install <skill>')}`);
+    return;
+  }
+
+  logger.info(`Installing ${skills.length} skill(s) from skillpkg.json`);
+  logger.blank();
+
+  const stateManager = createStateManager();
+  const storeManager = options.global ? createGlobalStore() : createLocalStore();
+  const fetcher = createFetcher();
+
+  // Initialize store if needed
+  if (!(await storeManager.isInitialized())) {
+    await withSpinner('Initializing store', () => storeManager.init());
+  }
+
+  const installer = createInstaller(stateManager, configManager, storeManager, fetcher);
+
+  const result = await withSpinner('Installing skills', async () => {
+    return installer.installFromConfig(cwd);
+  });
+
+  logger.blank();
+
+  if (!result.success) {
+    logger.error('Some installations failed:');
+    for (const error of result.errors) {
+      logger.log(`  ${colors.red('×')} ${error}`);
+    }
+  }
+
+  // Summary
+  const installed = result.skills.filter((s) => s.action === 'installed');
+  const skipped = result.skills.filter((s) => s.action === 'skipped');
+
+  logger.log(
+    `Summary: ${colors.green(String(installed.length))} installed, ` +
+      `${colors.dim(String(skipped.length))} skipped`
+  );
+
+  if (result.mcpRequired.length > 0) {
+    logger.blank();
+    logger.warn(`MCP servers required: ${result.mcpRequired.join(', ')}`);
+  }
+
+  logger.blank();
+}
+
+/**
+ * Create a SkillFetcherAdapter for the installer
+ */
+function createFetcher(): SkillFetcherAdapter {
+  return {
+    async fetchMetadata(source: string) {
+      const skill = await fetchSkillFromSource(source);
+      if (!skill) return null;
+
+      return {
+        name: skill.name,
+        version: skill.version,
+        dependencies: skill.dependencies,
+      };
+    },
+
+    async fetchSkill(source: string) {
+      return fetchSkillFromSource(source);
+    },
+  };
+}
+
+/**
+ * Fetch skill from various sources
+ */
+async function fetchSkillFromSource(source: string): Promise<Skill | null> {
+  const { type, value } = parseSource(source);
 
   switch (type) {
     case 'local':
-      await installFromLocal(value, options);
-      break;
+      return fetchFromLocal(value);
     case 'github':
-      await installFromGitHub(value, options);
-      break;
+      return fetchFromGitHub(value);
     case 'pack':
-      await installFromPack(value, options);
-      break;
+      return fetchFromPack(value);
+    default:
+      return null;
   }
 }
 
 /**
- * Install skill from local path
+ * Fetch skill from local path
  */
-async function installFromLocal(pathArg: string, options: InstallOptions): Promise<void> {
-  // Resolve path
+async function fetchFromLocal(pathArg: string): Promise<Skill | null> {
   const skillPath = isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
 
-  // Try to find skill file (SKILL.md or skill.yaml)
   let skillContent: string | null = null;
   let isSkillMd = false;
 
@@ -123,135 +288,75 @@ async function installFromLocal(pathArg: string, options: InstallOptions): Promi
     }
   }
 
-  if (!skillContent) {
-    logger.error(`No SKILL.md or skill.yaml found at ${skillPath}`);
-    process.exit(1);
-  }
+  if (!skillContent) return null;
 
-  // Parse skill
-  let skill: Skill;
   try {
     if (isSkillMd) {
-      skill = parseSkillMd(skillContent);
+      return parseSkillMd(skillContent);
     } else {
       const result = parse(skillContent);
-      if (!result.success || !result.data) {
-        logger.error('Failed to parse skill.yaml:');
-        result.errors?.forEach((e) => logger.error(`  ${e.message}`));
-        process.exit(1);
-      }
-      skill = result.data;
+      return result.success && result.data ? result.data : null;
     }
-  } catch (error) {
-    logger.error(`Failed to parse skill: ${error instanceof Error ? error.message : error}`);
-    process.exit(1);
+  } catch {
+    return null;
   }
-
-  await installSkill(skill, options, 'local');
 }
 
 /**
- * Install skill from GitHub
+ * Fetch skill from GitHub
  */
-async function installFromGitHub(repo: string, options: InstallOptions): Promise<void> {
-  logger.info(`Installing from GitHub: ${colors.cyan(repo)}`);
+async function fetchFromGitHub(repo: string): Promise<Skill | null> {
+  const detection = await detectSkillMd(repo);
+  if (!detection.hasSkill || !detection.skillFile) return null;
 
-  // Detect SKILL.md in the repository
-  const detection = await withSpinner('Checking for SKILL.md', async () => {
-    return detectSkillMd(repo);
-  });
+  const content = await fetchSkillMdContent(repo, detection.skillFile);
+  if (!content) return null;
 
-  if (!detection.hasSkill || !detection.skillFile) {
-    logger.error(`No SKILL.md found in ${repo}`);
-    logger.blank();
-    logger.log('Checked locations:');
-    SKILL_MD_PATHS.forEach((p) => logger.item(colors.dim(p)));
-    logger.blank();
-    logger.log(
-      colors.dim(
-        'Make sure the repository has a SKILL.md file with proper frontmatter (name, description).'
-      )
-    );
-    process.exit(1);
-  }
-
-  // Fetch SKILL.md content
-  const content = await withSpinner('Fetching SKILL.md', async () => {
-    return fetchSkillMdContent(repo, detection.skillFile!);
-  });
-
-  if (!content) {
-    logger.error('Failed to fetch SKILL.md content');
-    process.exit(1);
-  }
-
-  // Create skill object
-  const skill: Skill = {
+  return {
     schema: '1.0',
     name: content.name,
     version: content.version,
     description: content.description,
     instructions: content.instructions,
   };
-
-  await installSkill(skill, options, 'import', `github:${repo}`);
 }
 
 /**
- * Install skill from .skillpkg pack file
+ * Fetch skill from pack file
  */
-async function installFromPack(packPath: string, options: InstallOptions): Promise<void> {
-  // Resolve path
+async function fetchFromPack(packPath: string): Promise<Skill | null> {
   const fullPath = isAbsolute(packPath) ? packPath : resolve(process.cwd(), packPath);
+  if (!existsSync(fullPath)) return null;
 
-  if (!existsSync(fullPath)) {
-    logger.error(`Pack file not found: ${fullPath}`);
-    process.exit(1);
-  }
+  const extract = tar.extract();
+  const chunks: Buffer[] = [];
 
-  logger.info(`Installing from ${colors.cyan(packPath)}`);
-
-  // Extract skill.yaml from the pack
-  const skill = await withSpinner('Extracting pack', async (): Promise<Skill> => {
-    const extract = tar.extract();
-    const chunks: Buffer[] = [];
-
-    return new Promise<Skill>((resolvePromise, reject) => {
-      extract.on('entry', (header, stream, next) => {
-        // skill.yaml can be at root or inside a skill-named folder
-        if (header.name === 'skill.yaml' || header.name.endsWith('/skill.yaml')) {
-          stream.on('data', (chunk) => chunks.push(chunk));
-          stream.on('end', next);
-        } else {
-          stream.resume();
-          next();
-        }
-      });
-
-      extract.on('finish', async () => {
-        if (chunks.length === 0) {
-          reject(new Error('skill.yaml not found in pack'));
-          return;
-        }
-
-        const content = Buffer.concat(chunks).toString('utf-8');
-        const result = parse(content);
-
-        if (!result.success || !result.data) {
-          reject(new Error(`Failed to parse skill.yaml: ${result.errors?.[0]?.message}`));
-          return;
-        }
-
-        resolvePromise(result.data);
-      });
-
-      extract.on('error', reject);
-
-      createReadStream(fullPath).pipe(createGunzip()).pipe(extract);
+  return new Promise<Skill | null>((resolvePromise) => {
+    extract.on('entry', (header, stream, next) => {
+      if (header.name === 'skill.yaml' || header.name.endsWith('/skill.yaml')) {
+        stream.on('data', (chunk) => chunks.push(chunk));
+        stream.on('end', next);
+      } else {
+        stream.resume();
+        next();
+      }
     });
-  });
 
-  await installSkill(skill, options, 'local');
+    extract.on('finish', async () => {
+      if (chunks.length === 0) {
+        resolvePromise(null);
+        return;
+      }
+
+      const content = Buffer.concat(chunks).toString('utf-8');
+      const result = parse(content);
+      resolvePromise(result.success && result.data ? result.data : null);
+    });
+
+    extract.on('error', () => resolvePromise(null));
+
+    createReadStream(fullPath).pipe(createGunzip()).pipe(extract);
+  });
 }
 
 /**
@@ -276,46 +381,6 @@ function parseSkillMd(content: string): Skill {
     version: frontmatter.version || '1.0.0',
     description: frontmatter.description || frontmatter.metadata?.['short-description'] || '',
     instructions: match[2],
+    dependencies: frontmatter.dependencies,
   };
-}
-
-/**
- * Install skill to store
- */
-async function installSkill(
-  skill: Skill,
-  options: InstallOptions,
-  source: 'local' | 'import',
-  sourceUrl?: string
-): Promise<void> {
-  // Get store
-  const store = options.global ? createGlobalStore() : createLocalStore();
-
-  // Initialize store if needed
-  if (!(await store.isInitialized())) {
-    await withSpinner('Initializing store', () => store.init());
-  }
-
-  // Check if already installed
-  if (await store.hasSkill(skill.name)) {
-    const existing = await store.getSkill(skill.name);
-    if (existing?.version === skill.version) {
-      logger.warn(`${skill.name}@${skill.version} is already installed`);
-      return;
-    }
-    logger.info(`Updating ${skill.name} from ${existing?.version} to ${skill.version}`);
-  }
-
-  // Install skill
-  await withSpinner(`Installing ${colors.cyan(skill.name)}@${skill.version}`, async () => {
-    await store.addSkill(skill, { source, sourceUrl });
-  });
-
-  logger.blank();
-  logger.success(`Installed ${colors.cyan(skill.name)}@${skill.version}`);
-  logger.blank();
-  logger.log('Next steps:');
-  logger.item(`Run ${colors.cyan('skillpkg list')} to see installed skills`);
-  logger.item(`Run ${colors.cyan('skillpkg sync')} to sync to platforms`);
-  logger.blank();
 }

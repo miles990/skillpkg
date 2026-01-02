@@ -1,8 +1,14 @@
 /**
- * list command - List installed skills
+ * list command - List installed skills with dependency info
+ *
+ * v2.0: Shows installation source and dependency information
  */
-import { createGlobalStore, createLocalStore } from 'skillpkg-core';
-import type { SkillMeta } from 'skillpkg-core';
+import {
+  createGlobalStore,
+  createLocalStore,
+  createStateManager,
+  type SkillMeta,
+} from 'skillpkg-core';
 import { logger, colors, createTable, printTable } from '../ui/index.js';
 
 interface ListOptions {
@@ -14,7 +20,9 @@ interface ListOptions {
  * list command handler
  */
 export async function listCommand(options: ListOptions): Promise<void> {
+  const cwd = process.cwd();
   const store = options.global ? createGlobalStore() : createLocalStore();
+  const stateManager = createStateManager();
 
   // Check if store is initialized
   if (!(await store.isInitialized())) {
@@ -27,7 +35,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
     return;
   }
 
-  // Get all skills
+  // Get all skills from store
   const skills = await store.listSkills();
 
   if (skills.length === 0) {
@@ -40,41 +48,82 @@ export async function listCommand(options: ListOptions): Promise<void> {
     return;
   }
 
+  // Get state for dependency info
+  const state = await stateManager.loadState(cwd);
+
+  // Enrich skills with state info
+  const enrichedSkills: EnrichedSkillMeta[] = skills.map((skill) => {
+    const skillState = state.skills[skill.name];
+    return {
+      ...skill,
+      installedBy: skillState?.installed_by || 'unknown',
+      stateSource: skillState?.source || 'unknown',
+      hasDependents:
+        Object.values(state.skills).some((s) => s.depended_by?.includes(skill.name)) || false,
+    };
+  });
+
   // Output based on format
   if (options.json) {
-    console.log(JSON.stringify({ skills }, null, 2));
+    console.log(JSON.stringify({ skills: enrichedSkills }, null, 2));
   } else {
-    printSkillTable(skills, options.global);
+    printSkillTable(enrichedSkills, options.global);
   }
+}
+
+interface EnrichedSkillMeta extends SkillMeta {
+  installedBy: string;
+  stateSource: string;
+  hasDependents: boolean;
 }
 
 /**
  * Print skills as a table
  */
-function printSkillTable(skills: SkillMeta[], isGlobal: boolean = false): void {
+function printSkillTable(skills: EnrichedSkillMeta[], isGlobal: boolean = false): void {
   logger.header(`Installed Skills (${isGlobal ? 'global' : 'local'})`);
 
   const table = createTable({
-    head: ['Name', 'Version', 'Description', 'Synced To'],
+    head: ['Name', 'Version', 'Type', 'Description'],
   });
 
-  for (const skill of skills) {
-    const syncedPlatforms =
-      skill.syncedPlatforms.length > 0
-        ? skill.syncedPlatforms.map((p) => colors.green(p)).join(', ')
-        : colors.dim('none');
+  // Sort: user-installed first, then transitive
+  const sorted = [...skills].sort((a, b) => {
+    if (a.installedBy === 'user' && b.installedBy !== 'user') return -1;
+    if (a.installedBy !== 'user' && b.installedBy === 'user') return 1;
+    return a.name.localeCompare(b.name);
+  });
 
-    table.push([
-      colors.cyan(skill.name),
-      skill.version,
-      truncate(skill.description, 30),
-      syncedPlatforms,
-    ]);
+  for (const skill of sorted) {
+    const typeLabel =
+      skill.installedBy === 'user'
+        ? colors.green('direct')
+        : colors.dim(`dep:${skill.installedBy}`);
+
+    const nameWithMarker = skill.hasDependents
+      ? `${colors.cyan(skill.name)} ${colors.yellow('◆')}`
+      : colors.cyan(skill.name);
+
+    table.push([nameWithMarker, skill.version, typeLabel, truncate(skill.description, 35)]);
   }
 
   printTable(table);
   logger.blank();
-  logger.log(`Total: ${colors.cyan(String(skills.length))} skill(s)`);
+
+  // Summary
+  const userInstalled = skills.filter((s) => s.installedBy === 'user').length;
+  const transitive = skills.length - userInstalled;
+
+  logger.log(
+    `Total: ${colors.cyan(String(skills.length))} skill(s) ` +
+      `(${userInstalled} direct, ${transitive} transitive)`
+  );
+
+  // Legend
+  if (skills.some((s) => s.hasDependents)) {
+    logger.log(colors.dim(`${colors.yellow('◆')} = has dependents`));
+  }
+
   logger.blank();
 }
 
