@@ -134,8 +134,10 @@ export class DependencyResolver {
       }
 
       // Add this skill to resolved list
+      // Use actual skill name from metadata, not extracted from source URL
+      const actualSkillName = metadata.name || skillName;
       resolved.push({
-        name: skillName,
+        name: actualSkillName,
         source,
         type: 'skill',
         transitive: requiredBy !== null,

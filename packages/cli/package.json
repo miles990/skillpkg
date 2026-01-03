@@ -1,6 +1,6 @@
 {
   "name": "skillpkg-cli",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "CLI for skillpkg - Agent Skills Package Manager. Install once, use everywhere.",
   "type": "module",
   "bin": {
@@ -56,7 +56,7 @@
     "gray-matter": "^4.0.3",
     "inquirer": "^9.2.0",
     "ora": "^8.0.0",
-    "skillpkg-core": "^0.5.0",
+    "skillpkg-core": "^0.5.3",
     "tar-stream": "^3.1.7"
   },
   "devDependencies": {
