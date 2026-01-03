@@ -264,9 +264,5 @@ export class RegistryUnavailableError extends Error {
   }
 }
 
-export class InvalidSourceError extends Error {
-  constructor(source: string) {
-    super(`Invalid source format: "${source}". Supported formats: skill-name, github:user/repo, gist:id, https://..., or local path.`);
-    this.name = 'InvalidSourceError';
-  }
-}
+// InvalidSourceError is now imported from skillpkg-core
+export { InvalidSourceError } from 'skillpkg-core';

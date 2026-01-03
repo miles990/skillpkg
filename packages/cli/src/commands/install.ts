@@ -1,59 +1,29 @@
 /**
  * install command - Install a skill with dependency resolution
  *
- * v2.0: Uses new Installer module with dependency tracking
+ * v2.1: Uses unified fetcher from skillpkg-core
  *
  * Supports:
  * - Local path: skillpkg install ./path/to/skill
  * - GitHub: skillpkg install github:user/repo or skillpkg install user/repo
+ * - Gist: skillpkg install gist:id
+ * - URL: skillpkg install https://...
  * - Pack file: skillpkg install skill.skillpkg
  */
-import { existsSync, createReadStream } from 'fs';
-import { resolve, isAbsolute } from 'path';
-import { createGunzip } from 'zlib';
-import matter from 'gray-matter';
 import {
   createInstaller,
   createStateManager,
   createConfigManager,
   createLocalStore,
   createGlobalStore,
-  detectSkillMd,
-  fetchSkillMdContent,
-  readSkill,
-  hasSkillMd,
-  type Skill,
-  type SkillFetcherAdapter,
+  createSkillFetcherAdapter,
+  normalizeSource,
 } from 'skillpkg-core';
 import { logger, colors, withSpinner } from '../ui/index.js';
-import * as tar from 'tar-stream';
 
 interface InstallOptions {
   global?: boolean;
   registry?: string;
-}
-
-/**
- * Parse source string to determine source type
- */
-function parseSource(source: string): { type: 'local' | 'github' | 'pack'; value: string } {
-  // GitHub: github:user/repo
-  if (source.startsWith('github:')) {
-    return { type: 'github', value: source.slice(7) };
-  }
-
-  // GitHub: user/repo format
-  if (/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/.test(source) && !existsSync(source)) {
-    return { type: 'github', value: source };
-  }
-
-  // Pack file: *.skillpkg
-  if (source.endsWith('.skillpkg')) {
-    return { type: 'pack', value: source };
-  }
-
-  // Local path
-  return { type: 'local', value: source };
 }
 
 /**
@@ -71,14 +41,20 @@ export async function installCommand(
     return;
   }
 
-  const { type, value } = parseSource(skillArg);
-  const source = type === 'github' ? `github:${value}` : value;
+  // Parse source to get normalized format
+  let source: string;
+  try {
+    source = normalizeSource(skillArg);
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 
   // Create installer with fetcher
   const stateManager = createStateManager();
   const configManager = createConfigManager();
   const storeManager = options.global ? createGlobalStore() : createLocalStore();
-  const fetcher = createFetcher();
+  const fetcher = createSkillFetcherAdapter();
 
   // Initialize store if needed
   if (!(await storeManager.isInitialized())) {
@@ -178,7 +154,7 @@ async function installFromConfig(cwd: string, options: InstallOptions): Promise<
 
   const stateManager = createStateManager();
   const storeManager = options.global ? createGlobalStore() : createLocalStore();
-  const fetcher = createFetcher();
+  const fetcher = createSkillFetcherAdapter();
 
   // Initialize store if needed
   if (!(await storeManager.isInitialized())) {
@@ -215,146 +191,4 @@ async function installFromConfig(cwd: string, options: InstallOptions): Promise<
   }
 
   logger.blank();
-}
-
-/**
- * Create a SkillFetcherAdapter for the installer
- */
-function createFetcher(): SkillFetcherAdapter {
-  return {
-    async fetchMetadata(source: string) {
-      const skill = await fetchSkillFromSource(source);
-      if (!skill) return null;
-
-      return {
-        name: skill.name,
-        version: skill.version,
-        dependencies: skill.dependencies,
-      };
-    },
-
-    async fetchSkill(source: string) {
-      return fetchSkillFromSource(source);
-    },
-  };
-}
-
-/**
- * Fetch skill from various sources
- */
-async function fetchSkillFromSource(source: string): Promise<Skill | null> {
-  const { type, value } = parseSource(source);
-
-  switch (type) {
-    case 'local':
-      return fetchFromLocal(value);
-    case 'github':
-      return fetchFromGitHub(value);
-    case 'pack':
-      return fetchFromPack(value);
-    default:
-      return null;
-  }
-}
-
-/**
- * Fetch skill from local path
- */
-async function fetchFromLocal(pathArg: string): Promise<Skill | null> {
-  const skillPath = isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
-
-  // Only SKILL.md format is supported
-  if (!hasSkillMd(skillPath)) {
-    return null;
-  }
-
-  try {
-    const parsed = await readSkill(skillPath);
-    // Convert McpDependency[] to string[] for Skill type compatibility
-    const deps = parsed.metadata.dependencies;
-    const convertedDeps = deps
-      ? {
-          mcp: deps.mcp?.map((m) => m.package),
-        }
-      : undefined;
-    return {
-      schema: '1.0',
-      name: parsed.metadata.name,
-      version: parsed.metadata.version,
-      description: parsed.metadata.description,
-      instructions: parsed.content,
-      dependencies: convertedDeps,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Fetch skill from GitHub
- */
-async function fetchFromGitHub(repo: string): Promise<Skill | null> {
-  const detection = await detectSkillMd(repo);
-  if (!detection.hasSkill || !detection.skillFile) return null;
-
-  const content = await fetchSkillMdContent(repo, detection.skillFile);
-  if (!content) return null;
-
-  return {
-    schema: '1.0',
-    name: content.name,
-    version: content.version,
-    description: content.description,
-    instructions: content.instructions,
-  };
-}
-
-/**
- * Fetch skill from pack file
- */
-async function fetchFromPack(packPath: string): Promise<Skill | null> {
-  const fullPath = isAbsolute(packPath) ? packPath : resolve(process.cwd(), packPath);
-  if (!existsSync(fullPath)) return null;
-
-  const extract = tar.extract();
-  const chunks: Buffer[] = [];
-
-  return new Promise<Skill | null>((resolvePromise) => {
-    extract.on('entry', (header, stream, next) => {
-      // Look for SKILL.md in pack file
-      if (header.name === 'SKILL.md' || header.name.endsWith('/SKILL.md')) {
-        stream.on('data', (chunk) => chunks.push(chunk));
-        stream.on('end', next);
-      } else {
-        stream.resume();
-        next();
-      }
-    });
-
-    extract.on('finish', async () => {
-      if (chunks.length === 0) {
-        resolvePromise(null);
-        return;
-      }
-
-      // Parse SKILL.md with gray-matter
-      const content = Buffer.concat(chunks).toString('utf-8');
-      try {
-        const { data, content: body } = matter(content);
-        resolvePromise({
-          schema: '1.0',
-          name: (data.name as string) || '',
-          version: (data.version as string) || '1.0.0',
-          description: (data.description as string) || '',
-          instructions: body.trim(),
-        });
-      } catch {
-        resolvePromise(null);
-      }
-    });
-
-    extract.on('error', () => resolvePromise(null));
-
-    createReadStream(fullPath).pipe(createGunzip()).pipe(extract);
-  });
 }

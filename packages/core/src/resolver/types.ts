@@ -66,6 +66,8 @@ export interface McpResolutionResult {
 export interface SkillFetcher {
   /** Fetch skill metadata from source */
   fetchMetadata(source: string): Promise<SkillMetadata | null>;
+  /** Fetch full skill from source (optional, for full installation) */
+  fetchSkill?(source: string): Promise<import('../types.js').Skill | null>;
 }
 
 /**

@@ -4,7 +4,7 @@
  * Core library for skillpkg - Agent Skills Package Manager
  */
 
-export const VERSION = '0.2.1';
+export const VERSION = '0.5.4';
 
 // Types
 export * from './types.js';
@@ -47,3 +47,6 @@ export * from './installer/index.js';
 
 // Skill module - Read and create SKILL.md files
 export * from './skill/index.js';
+
+// Fetcher module - Unified skill fetching from various sources
+export * from './fetcher/index.js';
