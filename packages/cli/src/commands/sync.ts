@@ -7,6 +7,8 @@ import { join } from 'path';
 import {
   createSyncer,
   createConfigManager,
+  createLocalStore,
+  createStateManager,
   loadSkillsFromDirectory,
   getTargetConfig,
   getImplementedTargets,
@@ -178,6 +180,30 @@ export async function syncCommand(
   }
 
   logger.blank();
+
+  // Update sync status (only if not dry run and sync was successful)
+  if (!options.dryRun && totalSynced > 0) {
+    const store = createLocalStore(cwd);
+    const stateManager = createStateManager();
+    const syncedTargets = results
+      .filter((r) => r.files.some((f) => f.action === 'created' || f.action === 'updated'))
+      .map((r) => r.target);
+
+    // Update each skill's syncedPlatforms in registry
+    for (const skillName of skills.keys()) {
+      const entry = await store.getSkillEntry(skillName);
+      if (entry) {
+        const currentPlatforms = entry.syncedPlatforms || [];
+        const newPlatforms = [...new Set([...currentPlatforms, ...syncedTargets])];
+        await store.updateSyncedPlatforms(skillName, newPlatforms);
+      }
+    }
+
+    // Record sync in state (for status command)
+    for (const target of syncedTargets) {
+      await stateManager.recordSync(cwd, target as SyncTarget);
+    }
+  }
 
   // Summary
   logger.log(
