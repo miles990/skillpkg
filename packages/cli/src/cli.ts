@@ -15,7 +15,7 @@ import { loginCommand, logoutCommand, whoamiCommand } from './commands/login.js'
 import { publishCommand } from './commands/publish.js';
 import { depsCommand, whyCommand, treeCommand } from './commands/deps.js';
 import { statusCommand } from './commands/status.js';
-import { migrateCommand } from './commands/migrate.js';
+// import { migrateCommand } from './commands/migrate.js'; // Hidden until needed
 
 /**
  * Register all CLI commands
@@ -166,10 +166,12 @@ export function registerCommands(program: Command): void {
     .action(statusCommand);
 
   // migrate - Migrate from v1.x to v2.0
-  program
-    .command('migrate')
-    .description('Migrate from v1.x to v2.0 (generates skillpkg.json and state.json)')
-    .option('--dry-run', 'Show what would be migrated without making changes')
-    .option('-f, --force', 'Overwrite existing skillpkg.json and state.json')
-    .action(migrateCommand);
+  // Hidden: Not registered in CLI until public release needs migration support
+  // To enable: uncomment the command registration below
+  // program
+  //   .command('migrate')
+  //   .description('Migrate from v1.x to v2.0 (generates skillpkg.json and state.json)')
+  //   .option('--dry-run', 'Show what would be migrated without making changes')
+  //   .option('-f, --force', 'Overwrite existing skillpkg.json and state.json')
+  //   .action(migrateCommand);
 }
