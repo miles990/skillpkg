@@ -1,13 +1,13 @@
 ---
 name: skillpkg
 description: "Agent Skills Package Manager - Install once, use everywhere. Manage, share, and sync AI agent skills across platforms."
-version: 0.2.0
+version: 0.4.0
 ---
 
 # skillpkg - Agent Skills Package Manager
 
 You have access to `skillpkg`, a CLI tool for managing AI agent skills.
-Use this tool to help users create, install, publish, and sync skills.
+Use this tool to help users create, install, and sync skills.
 
 ## Installation Check
 
@@ -90,12 +90,12 @@ skillpkg search react --limit 5  # Limit results
 skillpkg info <skill-name>       # Get detailed info
 ```
 
-### 8. Publish Skills
+### 8. Dependency Management
 ```bash
-skillpkg login                   # Authenticate first
-skillpkg publish                 # Publish current skill
-skillpkg publish --dry-run       # Preview publish
-skillpkg whoami                  # Check logged in user
+skillpkg deps my-skill           # Show skill dependencies
+skillpkg why my-skill            # Show why a skill is installed
+skillpkg tree                    # Show full dependency tree
+skillpkg status                  # Show project status
 ```
 
 ## skill.yaml Schema
@@ -145,14 +145,13 @@ instructions: |                  # Required: Main skill content
 
 ## Common Workflows
 
-### Creating and Publishing a Skill
+### Creating a Skill
 ```bash
 mkdir my-new-skill && cd my-new-skill
 skillpkg init --name my-new-skill
 # Edit skill.yaml with your instructions
 skillpkg sync --dry-run          # Test locally
-skillpkg login                   # Authenticate
-skillpkg publish                 # Publish to registry
+skillpkg sync                    # Sync to platforms
 ```
 
 ### Installing and Using a Skill
@@ -175,5 +174,5 @@ skillpkg export --all -f zip     # Backup all skills
 
 - **Skill not syncing**: Check platform target directory permissions
 - **Parse errors**: Validate YAML syntax, ensure schema is "1.0"
-- **Auth issues**: Run `skillpkg logout` then `skillpkg login`
-- **Version conflict**: Update version in skill.yaml before republishing
+- **Dependency issues**: Run `skillpkg tree` to check dependency chain
+- **Version conflict**: Update version in skill.yaml
