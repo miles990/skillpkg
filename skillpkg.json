@@ -1,7 +1,9 @@
 {
   "$schema": "https://skillpkg.dev/schemas/skillpkg.json",
   "name": "skillpkg",
-  "skills": {},
+  "skills": {
+    "evolve": "github:miles990/self-evolving-agent"
+  },
   "mcp": {},
   "reminders": [],
   "sync_targets": {

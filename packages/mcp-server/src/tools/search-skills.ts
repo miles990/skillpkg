@@ -1,8 +1,12 @@
 /**
  * Tool: search_skills
  *
- * Searches for skills in local store and/or GitHub.
- * Uses SKILL.md format (industry standard for Claude Code and OpenAI Codex).
+ * Multi-source skill discovery with deduplication.
+ * Uses DiscoveryManager to search across:
+ * - local: Installed skills
+ * - skillsmp: Primary registry (40K+ skills, requires API key)
+ * - awesome: Fallback curated repos (no key required)
+ * - github: Supplementary search (topic-based with SKILL.md detection)
  */
 
 import type {
@@ -11,17 +15,20 @@ import type {
   SearchSkillsInput,
   SearchSkillsOutput,
   SearchSkillResult,
+  DiscoverySourceType,
 } from '../types.js';
-import type { Scope } from '../types.js';
 import {
   getStore,
   successResult,
   errorResult,
   validateString,
   validateLimit,
-  calculateRelevanceScore,
 } from './utils.js';
-import { searchGitHubSkills } from 'skillpkg-core';
+import {
+  createDiscoveryManager,
+  type DiscoverySource,
+  type DiscoveredSkill,
+} from 'skillpkg-core';
 
 export function createSearchSkillsHandler(): ToolHandler {
   return {
@@ -55,146 +62,111 @@ export function createSearchSkillsHandler(): ToolHandler {
 
       try {
         const query = validateString(input.query, 'query');
-        const source = input.source || 'all';
+        const sourceInput = (input.source || 'all') as DiscoverySourceType;
         const limit = validateLimit(input.limit, 20, 100);
 
-        const results: SearchSkillResult[] = [];
+        // Map input source to discovery sources
+        let sources: DiscoverySource[] | undefined;
+        if (sourceInput === 'local') {
+          sources = ['local'];
+        } else if (sourceInput === 'github') {
+          sources = ['github'];
+        } else if (sourceInput === 'skillsmp') {
+          sources = ['skillsmp'];
+        } else if (sourceInput === 'awesome') {
+          sources = ['awesome'];
+        }
+        // 'all' = undefined, let DiscoveryManager use getDefaultSources()
+
+        // Get local store for DiscoveryManager
+        const localStore = getStore('local');
+        const globalStore = getStore('global');
+
+        // Check which store is initialized
+        let storeManager;
+        if (await localStore.isInitialized()) {
+          storeManager = localStore;
+        } else if (await globalStore.isInitialized()) {
+          storeManager = globalStore;
+        }
+
+        // Create discovery manager
+        const manager = createDiscoveryManager({
+          skillsmpApiKey: process.env.SKILLSMP_API_KEY,
+          githubToken: process.env.GITHUB_TOKEN,
+          storeManager,
+        });
+
+        // Search
+        const result = await manager.search({
+          query,
+          limit,
+          sources,
+        });
+
+        // Convert to output format
         const installedNames = new Set<string>();
-
-        // Search local stores
-        if (source === 'all' || source === 'local') {
-          const scopes: Scope[] = ['local', 'global'];
-
-          for (const scope of scopes) {
-            const store = getStore(scope);
-            if (!(await store.isInitialized())) {
-              continue;
-            }
-
-            const skills = await store.listSkills();
-            const queryLower = query.toLowerCase();
-
-            for (const skill of skills) {
-              // Simple text matching
-              const nameMatch = skill.name.toLowerCase().includes(queryLower);
-              const descMatch = skill.description.toLowerCase().includes(queryLower);
-
-              if (nameMatch || descMatch) {
-                installedNames.add(skill.name);
-
-                results.push({
-                  id: `${scope}:${skill.name}`,
-                  name: skill.name,
-                  description: skill.description,
-                  version: skill.version,
-                  source: 'local',
-                  installed: true,
-                  rating: 0, // Local skills don't have ratings
-                  downloads: 0,
-                  updatedAt: skill.installedAt,
-                  tags: [],
-                  relevanceScore: calculateRelevanceScore(
-                    {
-                      name: skill.name,
-                      description: skill.description,
-                      updatedAt: skill.installedAt,
-                    },
-                    query
-                  ),
-                });
-              }
-            }
-          }
+        if (storeManager) {
+          const skills = await storeManager.listSkills();
+          skills.forEach((s) => installedNames.add(s.name));
         }
 
-        // Search GitHub
-        if (source === 'all' || source === 'github') {
-          try {
-            const githubResults = await searchGitHubSkills(query, { limit });
-
-            for (const skill of githubResults) {
-              const isInstalled = installedNames.has(skill.name);
-
-              // Skip if already in results from local
-              if (isInstalled && source === 'all') {
-                // Update existing entry with GitHub metadata
-                const existing = results.find((r) => r.name === skill.name);
-                if (existing) {
-                  existing.downloads = skill.stars; // Use stars as popularity metric
-                  existing.tags = skill.topics || [];
-                }
-                continue;
-              }
-
-              results.push({
-                id: `github:${skill.fullName}`,
-                name: skill.name,
-                description: skill.description,
-                version: '1.0.0', // GitHub doesn't have version info
-                source: 'github',
-                installed: isInstalled,
-                rating: 0,
-                downloads: skill.stars, // Use stars as popularity metric
-                updatedAt: skill.updatedAt,
-                tags: skill.topics || [],
-                relevanceScore: calculateRelevanceScore(
-                  {
-                    name: skill.name,
-                    description: skill.description,
-                    downloads: skill.stars,
-                    updatedAt: skill.updatedAt,
-                    tags: skill.topics,
-                  },
-                  query
-                ) + (skill.hasSkill ? 20 : 0), // Boost repos with SKILL.md
-              });
-            }
-          } catch (error) {
-            // GitHub might be unavailable or rate limited
-            if (source === 'github') {
-              const message = error instanceof Error ? error.message : 'Unknown error';
-              return errorResult(
-                `GitHub search failed: ${message}`,
-                'Try searching with source: "local" to see installed skills, or set GITHUB_TOKEN for higher rate limits.'
-              );
-            }
-          }
-        }
-
-        // Sort by relevance score (descending)
-        results.sort((a, b) => b.relevanceScore - a.relevanceScore);
-
-        // Apply limit
-        const limitedResults = results.slice(0, limit);
+        const results: SearchSkillResult[] = result.skills.map((skill) =>
+          toSearchResult(skill, installedNames)
+        );
 
         const output: SearchSkillsOutput = {
-          results: limitedResults,
+          results,
           total: results.length,
           query,
+          duplicatesRemoved: result.duplicatesRemoved,
+          sourcesQueried: result.sourcesQueried,
         };
 
-        // Format output
-        if (limitedResults.length === 0) {
-          return successResult(`No skills found for "${query}".`);
+        // Format output text
+        if (results.length === 0) {
+          let text = `No skills found for "${query}".`;
+          if (result.errors) {
+            text += '\n\nErrors:';
+            for (const [source, error] of Object.entries(result.errors)) {
+              text += `\n• ${source}: ${error}`;
+            }
+          }
+          return successResult(text);
         }
 
-        let text = `Found ${output.total} skill(s) for "${query}":\n\n`;
+        let text = `Found ${output.total} skill(s) for "${query}"`;
+        if (output.duplicatesRemoved > 0) {
+          text += ` (${output.duplicatesRemoved} duplicates removed)`;
+        }
+        text += `:\n\n`;
 
-        for (const skill of limitedResults) {
+        for (const skill of results) {
           const installed = skill.installed ? ' [installed]' : '';
-          const rating = skill.rating > 0 ? ` ⭐${skill.rating.toFixed(1)}` : '';
-          const downloads = skill.downloads > 0 ? ` 📥${skill.downloads}` : '';
+          const stars = skill.stars ? ` ⭐${skill.stars}` : '';
+          const author = skill.author ? ` by ${skill.author}` : '';
 
-          text += `• ${skill.name} v${skill.version}${installed}${rating}${downloads}\n`;
+          text += `• ${skill.name}${installed}${stars}${author}\n`;
           text += `  ${skill.description}\n`;
-          if (skill.tags.length > 0) {
+          text += `  Source: ${skill.source}\n`;
+
+          if (skill.foundIn && skill.foundIn.length > 1) {
+            text += `  Also in: ${skill.foundIn.slice(1).join(', ')}\n`;
+          }
+
+          if (skill.tags && skill.tags.length > 0) {
             text += `  Tags: ${skill.tags.join(', ')}\n`;
           }
           text += '\n';
         }
 
-        if (output.total > limit) {
-          text += `Showing ${limit} of ${output.total} results.`;
+        text += `Sources queried: ${output.sourcesQueried.join(', ')}`;
+
+        if (result.errors) {
+          text += '\n\nErrors:';
+          for (const [source, error] of Object.entries(result.errors)) {
+            text += `\n• ${source}: ${error}`;
+          }
         }
 
         return successResult(text.trim());
@@ -203,5 +175,27 @@ export function createSearchSkillsHandler(): ToolHandler {
         return errorResult(`Search failed: ${message}`);
       }
     },
+  };
+}
+
+/**
+ * Convert DiscoveredSkill to SearchSkillResult
+ */
+function toSearchResult(
+  skill: DiscoveredSkill,
+  installedNames: Set<string>
+): SearchSkillResult {
+  return {
+    id: `${skill.provider}:${skill.name}`,
+    name: skill.name,
+    description: skill.description,
+    source: skill.source,
+    provider: skill.provider,
+    installed: installedNames.has(skill.name),
+    stars: skill.stars,
+    author: skill.author,
+    updatedAt: skill.lastUpdated,
+    tags: skill.keywords,
+    foundIn: skill.foundIn,
   };
 }

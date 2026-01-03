@@ -50,3 +50,6 @@ export * from './skill/index.js';
 
 // Fetcher module - Unified skill fetching from various sources
 export * from './fetcher/index.js';
+
+// Discovery module - Multi-source skill discovery
+export * from './discovery/index.js';

@@ -10,6 +10,7 @@
 
 export type Scope = 'local' | 'global';
 export type Source = 'all' | 'local' | 'github';
+export type DiscoverySourceType = 'all' | 'local' | 'skillsmp' | 'awesome' | 'github';
 export type SourceType = 'github' | 'gist' | 'url' | 'local';
 export type RecommendCriteria = 'auto' | 'popular' | 'highest_rated' | 'newest';
 
@@ -56,7 +57,7 @@ export interface ToolHandler {
 
 export interface SearchSkillsInput {
   query: string;
-  source?: Source;
+  source?: DiscoverySourceType;
   limit?: number;
 }
 
@@ -64,20 +65,23 @@ export interface SearchSkillResult {
   id: string;
   name: string;
   description: string;
-  version: string;
-  source: 'local' | 'github';
-  installed: boolean;
-  rating: number;
-  downloads: number;
-  updatedAt: string;
-  tags: string[];
-  relevanceScore: number;
+  version?: string;
+  source: string; // Install source (e.g., "github:user/repo#path")
+  provider: 'local' | 'skillsmp' | 'awesome' | 'github';
+  installed?: boolean;
+  stars?: number;
+  author?: string;
+  updatedAt?: string;
+  tags?: string[];
+  foundIn?: string[]; // Which sources contain this skill
 }
 
 export interface SearchSkillsOutput {
   results: SearchSkillResult[];
   total: number;
   query: string;
+  duplicatesRemoved: number;
+  sourcesQueried: string[];
 }
 
 // ============================================================

@@ -18,6 +18,7 @@ import { createRecommendSkillHandler } from './recommend-skill.js';
 import { createSyncSkillsHandler } from './sync-skills.js';
 import { createCreateSkillHandler } from './create-skill.js';
 import { createSkillStatusHandler } from './skill-status.js';
+import { createFetchSkillContentHandler } from './fetch-skill-content.js';
 
 /**
  * Create all tool handlers
@@ -37,6 +38,7 @@ export function createAllToolHandlers(): ToolHandler[] {
     createSearchSkillsHandler(),
     createSkillInfoHandler(),
     createRecommendSkillHandler(),
+    createFetchSkillContentHandler(),
   ];
 }
 
@@ -52,6 +54,7 @@ export {
   createSkillStatusHandler,
   createSkillInfoHandler,
   createRecommendSkillHandler,
+  createFetchSkillContentHandler,
 };
 
 // Re-export utilities

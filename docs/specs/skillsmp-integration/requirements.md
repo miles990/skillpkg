@@ -1,185 +1,230 @@
-# 通用 Registry 整合需求規格
+# Skills Registry 整合需求規格
 
 ## 概述
 
-建立可插拔的 Registry 架構，讓 skillpkg 可以從多個來源搜尋與安裝 skills。
+讓 AI 可以從多個來源搜尋、發現、分析 SKILL.md，並決定直接使用或參考建立新 skill。
 
-## 背景
+## 核心理念
 
-### 現有限制
-1. skillpkg 只支援根目錄或 `.claude/skills/` 的 SKILL.md
-2. 缺乏集中式搜尋功能
-3. 無法整合第三方 skill 來源
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  AI 驅動的 Skill Discovery                                     │
+│                                                                 │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │
+│  │  搜尋發現   │ ──→ │  分析學習   │ ──→ │  決策行動   │       │
+│  │             │     │             │     │             │       │
+│  │ • local     │     │ • 讀取內容  │     │ A. 直接安裝 │       │
+│  │ • awesome   │     │ • 理解結構  │     │ B. 改造使用 │       │
+│  │ • github    │     │ • 學習模式  │     │ C. 參考建新 │       │
+│  └─────────────┘     └─────────────┘     └─────────────┘       │
+│                                                                 │
+│  重點：MCP 工具給 AI 用，CLI 只顯示結果                         │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### 潛在 Registry 來源
-| 來源 | 說明 | 狀態 |
-|------|------|------|
-| Skills Marketplace | skillsmp.com, 40K+ skills | 已存在 |
-| GitHub Search | 直接搜尋 GitHub SKILL.md | 可實作 |
-| 自建 Registry | 企業內部 registry | 未來 |
-| npm-like Registry | 類似 npm 的中心化 registry | 未來 |
+## 資料來源
+
+### 來源優先順序
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  有 API Key：  local → skillsmp (40K+) → github                 │
+│  無 API Key：  local → awesome (~30) → github                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| 優先級 | 來源 | 數量 | 需要 API Key | 說明 |
+|--------|------|------|--------------|------|
+| 1 | `local` | 已安裝 | ❌ | 永遠優先 |
+| 2 | `skillsmp` | 40,000+ | ✅ | **主要來源** |
+| 2 | `awesome` | ~30 | ❌ | 無 Key 時的 fallback |
+| 3 | `github` | 不定 | ❌ | 補充搜尋 |
+
+### Skillsmp.com (主要來源)
+
+全球最大 skill registry，40,000+ skills，支援 AI 組合學習：
+
+```
+API: https://skillsmp.com/api/v1/skills/search
+認證: Authorization: Bearer sk_live_xxx
+```
+
+**首次設定（一次性）**：
+```bash
+skillpkg config set skillsmp.apiKey sk_live_xxx
+```
+
+### Awesome Repos (Fallback)
+
+無 API Key 時的備選來源：
+
+| Repo | 說明 |
+|------|------|
+| `anthropics/skills` | 官方範例 |
+| `ComposioHQ/awesome-claude-skills` | 社群精選 |
+
+### GitHub Topic 搜尋 (補充)
+
+用 `topic:claude-skill` 搜尋，作為補充來源。
 
 ## 功能需求
 
-### FR-1: 支援子目錄 SKILL.md 安裝 (P0)
+### FR-1: 子目錄 SKILL.md 支援 ✅ 已完成
 
-**描述**：skillpkg 可以安裝位於 repo 任意路徑的 SKILL.md
-
-**驗收標準**：
-- [ ] 支援 `github:user/repo#path/to/skill` 格式
-- [ ] 支援 `github:user/repo/path/to/skill` 格式 (alias)
-- [ ] fetcher 可以從指定路徑取得 SKILL.md
-- [ ] 安裝後正確記錄完整 source URL
-
-**範例**：
-```bash
-# 兩種格式等效
-skillpkg install github:user/repo#docs/skills/my-skill
-skillpkg install github:user/repo/docs/skills/my-skill
-```
-
-### FR-2: Registry Provider 介面 (P1)
-
-**描述**：定義通用的 Registry 介面，讓不同來源可以插入
+**描述**：支援 `github:user/repo#path/to/skill` 格式
 
 **驗收標準**：
-- [ ] 定義 `RegistryProvider` 介面
-- [ ] 支援 `search()`, `browse()`, `getSkill()` 方法
-- [ ] 每個 provider 可獨立啟用/停用
-- [ ] 支援優先級排序
+- [x] 支援 `github:user/repo#path` 格式
+- [x] fetcher 可從指定路徑取得 SKILL.md
+- [x] 安裝後正確記錄完整 source URL
 
-**介面定義**：
+### FR-2: 多來源搜尋
+
+**描述**：AI 可同時搜尋多個來源
+
+**驗收標準**：
+- [ ] 支援 local (已安裝) 搜尋
+- [ ] 支援 awesome repos 搜尋
+- [ ] 支援 GitHub topic 搜尋 (補充)
+- [ ] 結果包含可安裝的 source URL
+
+**MCP 工具**：
 ```typescript
-interface RegistryProvider {
-  name: string;
-  enabled: boolean;
-  priority: number;  // 數字越小優先級越高
-
-  search(query: string, options?: SearchOptions): Promise<SearchResult>;
-  browse(category?: string, options?: BrowseOptions): Promise<BrowseResult>;
-  getSkill(id: string): Promise<SkillInfo | null>;
-}
+search_skills({
+  query: "git commit helper",
+  sources: ["local", "awesome", "github"],  // 可選，預設 local+awesome
+  limit: 20
+})
+// 返回: SkillInfo[] 包含 name, description, source, stars, found_in
 ```
 
-### FR-3: 多 Registry 搜尋 (P1)
+### FR-3: Skill 內容抓取
 
-**描述**：搜尋時合併多個 registry 的結果
+**描述**：AI 可讀取任意 SKILL.md 的完整內容
 
 **驗收標準**：
-- [ ] 預設搜尋所有啟用的 registries
-- [ ] 可指定單一 registry 搜尋
-- [ ] 結果按優先級和相關度排序
-- [ ] 去重（相同 repo 的 skill）
+- [ ] 給定 source URL，返回 SKILL.md 原始內容
+- [ ] 支援 GitHub repo (含 subpath)
+- [ ] 支援已安裝的 local skills
+- [ ] 返回解析後的 metadata
+
+**MCP 工具**：
+```typescript
+fetch_skill_content({
+  source: "github:user/repo#path"
+})
+// 返回: { content: string, metadata: {...} }
+```
+
+### FR-4: 去重機制
+
+**描述**：同一 skill 出現在多個 awesome repos 時自動去重
+
+**驗收標準**：
+- [ ] 使用 normalized source URL 作為去重 key
+- [ ] 保留 `found_in` 資訊（出現在哪些 repos）
+- [ ] 返回 `duplicates_removed` 數量
+
+### FR-5: CLI 結果顯示
+
+**描述**：CLI 只顯示搜尋結果
+
+**驗收標準**：
+- [ ] `skillpkg search <query>` 顯示結果列表
+- [ ] 結果包含 source URL 可直接複製安裝
+- [ ] 顯示去重數量和 `Also in:` 資訊
 
 **範例**：
 ```bash
-# 搜尋所有 registries
-skillpkg search "git helper"
+$ skillpkg search "git commit"
 
-# 只搜尋特定 registry
-skillpkg search "git helper" --registry=skillsmp
-skillpkg search "git helper" --registry=github
+Found 5 skills (2 duplicates removed):
+
+  git-helper         ⭐120
+  Git operations and commit message helper
+  github:alice/tools#git-helper
+  Also in: travisvn/awesome-claude-skills
+
+  conventional-commits  ⭐85
+  Conventional commit format
+  github:bob/repo
+
+Install: skillpkg install <source>
 ```
-
-### FR-4: Registry 設定 (P2)
-
-**描述**：用戶可在設定檔中配置 registries
-
-**驗收標準**：
-- [ ] 支援在 `skillpkg.json` 或 `~/.skillpkg/config.json` 設定
-- [ ] 可啟用/停用個別 registry
-- [ ] 可設定 API tokens (如 GitHub token)
-- [ ] 可新增自訂 registry URL
-
-**設定範例**：
-```json
-{
-  "registries": {
-    "skillsmp": {
-      "enabled": true,
-      "priority": 1
-    },
-    "github": {
-      "enabled": true,
-      "priority": 2,
-      "token": "${GITHUB_TOKEN}"
-    },
-    "custom": {
-      "enabled": false,
-      "url": "https://my-registry.example.com/api",
-      "priority": 3
-    }
-  }
-}
-```
-
-## 內建 Registry Providers
-
-### 1. Skills Marketplace Provider
-- **ID**: `skillsmp`
-- **API**: `https://skillsmp.com/api/skills`
-- **特點**: 40K+ 預索引的 skills
-- **預設**: 啟用
-
-### 2. GitHub Search Provider
-- **ID**: `github`
-- **API**: GitHub Search API
-- **特點**: 即時搜尋所有公開 repo
-- **預設**: 啟用
-- **限制**: 需 token 避免 rate limit
-
-### 3. Local Provider
-- **ID**: `local`
-- **來源**: 已安裝的 skills
-- **特點**: 離線可用
-- **預設**: 啟用
 
 ## 非功能需求
 
-### NFR-1: 可擴展性
-- 新增 provider 只需實作介面
-- 不需修改核心程式碼
+### NFR-1: AI 優先
+
+- MCP 工具是主要介面
+- CLI 是輔助，只顯示結果
+- 過程由 AI 自行處理
 
 ### NFR-2: 效能
-- 並行查詢多個 registries
-- 單一 registry 回應時間 < 3 秒
-- 快取搜尋結果 5 分鐘
+
+- 並行查詢多個來源
+- awesome repos 快取 30 分鐘
+- github 搜尋快取 5 分鐘
 
 ### NFR-3: 容錯
-- 單一 registry 失敗不影響其他
-- 顯示失敗的 registry 名稱
-- 總是返回可用的結果
+
+- 單一來源失敗不影響其他
+- 返回部分可用結果
 
 ## 優先級
 
-| 需求 | 優先級 | 原因 |
+| 需求 | 優先級 | 狀態 |
 |------|--------|------|
-| FR-1 子目錄支援 | P0 | 基礎功能 |
-| FR-2 Provider 介面 | P1 | 架構基礎 |
-| FR-3 多 Registry 搜尋 | P1 | 核心價值 |
-| FR-4 Registry 設定 | P2 | 進階功能 |
+| FR-1 子目錄支援 | P0 | ✅ 完成 |
+| FR-2 多來源搜尋 | P1 | ⏳ |
+| FR-3 內容抓取 | P1 | ⏳ |
+| FR-4 去重機制 | P1 | ⏳ |
+| FR-5 CLI 結果 | P2 | ⏳ |
 
-## URL 格式規範
+## 使用場景
 
-### GitHub 子目錄格式
-
-```
-# 推薦格式 (明確分隔)
-github:user/repo#path/to/skill
-
-# 別名格式 (向後相容)
-github:user/repo/path/to/skill
-
-# 完整 URL 格式
-https://github.com/user/repo/tree/main/path/to/skill
-```
-
-### 解析規則
+### 場景 1: 找現成 Skill
 
 ```
-github:user/repo              → repo root
-github:user/repo#path         → repo + subpath
-github:user/repo/path         → 嘗試: 1) subpath 2) 不同 repo
-user/repo                     → 等同 github:user/repo
-user/repo#path                → 等同 github:user/repo#path
+用戶：我需要一個幫我寫 commit message 的 skill
+
+AI：
+1. search_skills({ query: "git commit message" })
+2. 找到 3 個相關 skills (已去重)
+3. 顯示給用戶選擇
+4. 用戶選擇後 install_skill(source)
 ```
+
+### 場景 2: 參考建立新 Skill
+
+```
+用戶：幫我建一個專門處理 PR review 的 skill
+
+AI：
+1. search_skills({ query: "code review PR" })
+2. 找到相關 skills
+3. fetch_skill_content(top_result) 讀取內容
+4. 分析結構和模式
+5. 參考建立新 skill，針對用戶需求調整
+```
+
+### 場景 3: 改造現有 Skill
+
+```
+用戶：git-helper 不錯但缺少 X 功能
+
+AI：
+1. fetch_skill_content("github:user/repo#git-helper")
+2. 讀取完整內容
+3. 分析結構
+4. 建立新版本加入 X 功能
+```
+
+## 設計決策
+
+| 決策 | 選擇 | 原因 |
+|------|------|------|
+| 主要來源 | skillsmp.com | 40K+ skills，AI 組合學習需要大量樣本 |
+| Fallback | awesome repos | 無 API Key 時仍可使用基本功能 |
+| GitHub 搜尋方式 | topic 而非 filename | 更精準，減少雜訊 |
+| 去重 key | normalized source URL | 準確識別相同 skill |

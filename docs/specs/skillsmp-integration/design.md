@@ -4,546 +4,565 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        skillpkg                                 │
+│                  AI 驅動的 Skill Discovery                       │
 │                                                                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐ │
-│  │   CLI       │    │   MCP       │    │   Core              │ │
-│  │             │    │             │    │                     │ │
-│  │ search      │    │ search_     │    │ ┌─────────────────┐ │ │
-│  │ browse      │────│ skills      │────│ │ registry/       │ │ │
-│  │ install     │    │ browse_     │    │ │  manager.ts     │ │ │
-│  │             │    │ skills      │    │ │  types.ts       │ │ │
-│  └─────────────┘    └─────────────┘    │ └────────┬────────┘ │ │
-│                                         │          │          │ │
-│                                         │ ┌────────▼────────┐ │ │
-│                                         │ │ providers/      │ │ │
-│                                         │ │  local.ts       │ │ │
-│                                         │ │  github.ts      │ │ │
-│                                         │ │  skillsmp.ts    │ │ │
-│                                         │ └────────┬────────┘ │ │
-│                                         │          │          │ │
-│                                         │ ┌────────▼────────┐ │ │
-│                                         │ │ fetcher/        │ │ │
-│                                         │ │  (擴展 subpath) │ │ │
-│                                         │ └─────────────────┘ │ │
-│                                         └─────────────────────┘ │
+│  ┌─────────────┐                    ┌─────────────────────────┐ │
+│  │   MCP 工具   │ ←── 主要介面 ────→ │   AI Agent             │ │
+│  │             │                    │                         │ │
+│  │ search_     │                    │ • 搜尋多來源            │ │
+│  │ skills      │                    │ • 分析 SKILL.md 內容    │ │
+│  │             │                    │ • 決策：使用/改造/新建  │ │
+│  │ fetch_      │                    │                         │ │
+│  │ skill_      │                    │                         │ │
+│  │ content     │                    │                         │ │
+│  └─────────────┘                    └─────────────────────────┘ │
+│         │                                                       │
+│         ▼                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    packages/core                            ││
+│  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐ ││
+│  │  │ registry/   │    │ fetcher/    │    │ store/          │ ││
+│  │  │ manager.ts  │────│ fetcher.ts  │────│ (現有)          │ ││
+│  │  │ providers/* │    │ (含 subpath)│    │                 │ ││
+│  │  └─────────────┘    └─────────────┘    └─────────────────┘ ││
+│  └─────────────────────────────────────────────────────────────┘│
+│         │                    │                    │             │
+│         ▼                    ▼                    ▼             │
+│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
+│   │   Local     │    │   Awesome   │    │   GitHub    │        │
+│   │  Installed  │    │   Repos     │    │  (補充)     │        │
+│   └─────────────┘    └─────────────┘    └─────────────┘        │
+│                             │                                   │
+│                             ▼                                   │
+│                 ┌───────────────────────┐                      │
+│                 │ • anthropics/skills   │                      │
+│                 │ • ComposioHQ/awesome  │                      │
+│                 │ • travisvn/awesome    │                      │
+│                 │ • VoltAgent/awesome   │                      │
+│                 └───────────────────────┘                      │
+│                                                                 │
+│  ┌─────────────┐                                               │
+│  │   CLI       │ ←── 只顯示結果                                │
+│  │ search      │                                               │
+│  └─────────────┘                                               │
 └─────────────────────────────────────────────────────────────────┘
-          │                    │                    │
-          ▼                    ▼                    ▼
-   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-   │   Local     │    │   GitHub    │    │  SkillsMP   │
-   │  Installed  │    │  Search API │    │    API      │
-   └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-## 模組設計
+## 資料來源
 
-### 1. Registry Types (`packages/core/src/registry/types.ts`)
+### 優先順序
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  有 API Key：  local → skillsmp (40K+) → github                 │
+│  無 API Key：  local → awesome (~30) → github                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| 優先級 | 來源 | 數量 | 需要 API Key | 說明 |
+|--------|------|------|--------------|------|
+| 1 | `local` | 已安裝 | ❌ | 永遠優先 |
+| 2 | `skillsmp` | 40,000+ | ✅ | **主要來源** |
+| 2 | `awesome` | ~30 | ❌ | 無 Key 時的 fallback |
+| 3 | `github` | 不定 | ❌ | 補充搜尋 |
+
+### Skillsmp.com 設定 (主要來源)
 
 ```typescript
-/**
- * 搜尋選項
- */
-export interface SearchOptions {
-  query: string;
-  category?: string;
-  sort?: 'stars' | 'updated' | 'relevance';
-  order?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
+const SKILLSMP_CONFIG = {
+  baseUrl: 'https://skillsmp.com/api/v1',
+  endpoints: {
+    search: '/skills/search',      // 關鍵字搜尋
+    aiSearch: '/skills/ai-search', // AI 語意搜尋
+  },
+};
+```
+
+### Awesome Repos 清單 (Fallback)
+
+```typescript
+// 無 API Key 時使用
+const AWESOME_REPOS = [
+  'anthropics/skills',                    // 官方範例
+  'ComposioHQ/awesome-claude-skills',     // 社群精選
+];
+```
+
+## 去重機制
+
+### 去重 Key
+
+使用 **normalized source URL** 作為去重 key：
+
+```typescript
+function normalizeSourceForDedup(source: string): string {
+  // github:User/Repo#Path → github:user/repo#path (小寫)
+  const parsed = parseSource(source);
+  if (parsed.type === 'github') {
+    const key = parsed.subpath
+      ? `github:${parsed.value.toLowerCase()}#${parsed.subpath.toLowerCase()}`
+      : `github:${parsed.value.toLowerCase()}`;
+    return key;
+  }
+  return source.toLowerCase();
+}
+```
+
+### 去重邏輯
+
+```typescript
+function deduplicateSkills(skills: SkillInfo[]): SkillInfo[] {
+  const seen = new Map<string, SkillInfo>();
+
+  for (const skill of skills) {
+    const key = normalizeSourceForDedup(skill.source);
+
+    // 保留第一個出現的 (優先級高的來源先加入)
+    if (!seen.has(key)) {
+      seen.set(key, skill);
+    }
+  }
+
+  return Array.from(seen.values());
+}
+```
+
+### 去重範例
+
+```
+輸入 (來自多個 awesome repos):
+  1. [ComposioHQ] git-helper → github:alice/tools#git-helper
+  2. [travisvn]   git-helper → github:alice/tools#git-helper  ← 重複
+  3. [ComposioHQ] code-review → github:bob/review
+  4. [VoltAgent]  test-helper → github:carol/test
+
+輸出 (去重後):
+  1. git-helper   → github:alice/tools#git-helper
+  2. code-review  → github:bob/review
+  3. test-helper  → github:carol/test
+```
+
+## MCP 工具設計
+
+### 1. search_skills
+
+```typescript
+{
+  name: 'search_skills',
+  description: 'Search for skills from multiple sources. Returns deduplicated results.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'Search keywords (e.g., "git commit", "code review")'
+      },
+      sources: {
+        type: 'array',
+        items: { type: 'string', enum: ['local', 'skillsmp', 'awesome', 'github'] },
+        description: 'Sources to search. Auto-detected: skillsmp (if API key) or awesome (fallback).'
+      },
+      limit: {
+        type: 'number',
+        default: 20,
+        description: 'Max results (after deduplication)'
+      }
+    },
+    required: ['query']
+  }
 }
 
-/**
- * 搜尋結果中的 Skill 資訊
- */
-export interface SkillInfo {
-  /** 唯一識別碼 (provider 內) */
-  id: string;
-  /** Skill 名稱 */
-  name: string;
-  /** 描述 */
-  description: string;
-  /** 作者 */
-  author: string;
-  /** 可安裝的 source URL */
-  source: string;
-  /** GitHub 星數 */
-  stars?: number;
-  /** 最後更新時間 */
-  updatedAt?: string;
-  /** 來源 provider */
-  provider: string;
-}
-
-/**
- * 搜尋結果
- */
-export interface SearchResult {
+// Response
+interface SearchResult {
   skills: SkillInfo[];
-  total: number;
-  hasMore: boolean;
-  /** 各 provider 的狀態 */
-  providerStatus: Record<string, 'success' | 'error' | 'disabled'>;
+  sources_queried: string[];
+  duplicates_removed: number;  // 去重數量
+  errors?: Record<string, string>;
 }
 
-/**
- * Registry Provider 介面
- */
-export interface RegistryProvider {
-  /** Provider 唯一識別碼 */
-  readonly id: string;
-  /** 顯示名稱 */
-  readonly name: string;
-  /** 是否啟用 */
-  enabled: boolean;
-  /** 優先級 (數字越小越優先) */
-  priority: number;
-
-  /**
-   * 搜尋 skills
-   */
-  search(options: SearchOptions): Promise<SkillInfo[]>;
-
-  /**
-   * 取得單一 skill 詳情
-   */
-  getSkill(id: string): Promise<SkillInfo | null>;
-
-  /**
-   * 檢查 provider 是否可用
-   */
-  isAvailable(): Promise<boolean>;
-}
-
-/**
- * Registry 設定
- */
-export interface RegistryConfig {
-  enabled: boolean;
-  priority: number;
-  /** Provider 特定設定 */
-  options?: Record<string, unknown>;
+interface SkillInfo {
+  name: string;
+  description: string;
+  source: string;           // 可安裝的 source URL
+  stars?: number;
+  forks?: number;
+  last_updated?: string;
+  author?: string;
+  provider: string;         // 來自哪個 registry
+  found_in?: string[];      // 出現在哪些 awesome repos
 }
 ```
 
-### 2. Registry Manager (`packages/core/src/registry/manager.ts`)
+### 2. fetch_skill_content
 
 ```typescript
-export class RegistryManager {
-  private providers: Map<string, RegistryProvider> = new Map();
-
-  /**
-   * 註冊 provider
-   */
-  register(provider: RegistryProvider): void {
-    this.providers.set(provider.id, provider);
+{
+  name: 'fetch_skill_content',
+  description: 'Fetch the full content of a SKILL.md file for analysis.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      source: {
+        type: 'string',
+        description: 'Skill source (github:user/repo#path or local:name)'
+      }
+    },
+    required: ['source']
   }
+}
 
-  /**
-   * 取得所有啟用的 providers (按優先級排序)
-   */
-  getEnabledProviders(): RegistryProvider[] {
-    return Array.from(this.providers.values())
-      .filter(p => p.enabled)
-      .sort((a, b) => a.priority - b.priority);
-  }
+// Response
+interface FetchResult {
+  content: string;           // SKILL.md 原始內容
+  metadata: {
+    name: string;
+    description: string;
+    allowed_tools?: string[];
+    model?: string;
+  };
+  source: string;
+}
+```
 
-  /**
-   * 搜尋所有 registries
-   */
-  async search(options: SearchOptions): Promise<SearchResult> {
-    const providers = this.getEnabledProviders();
-    const results = await Promise.allSettled(
-      providers.map(p => p.search(options))
+## Provider 實作
+
+### AwesomeProvider
+
+```typescript
+// packages/core/src/registry/providers/awesome.ts
+
+const AWESOME_REPOS = [
+  'anthropics/skills',
+  'ComposioHQ/awesome-claude-skills',
+  'travisvn/awesome-claude-skills',
+  'VoltAgent/awesome-claude-skills',
+];
+
+export class AwesomeProvider implements RegistryProvider {
+  readonly id = 'awesome';
+  private cache: Map<string, SkillInfo[]> = new Map();
+  private cacheExpiry: number = 30 * 60 * 1000; // 30 分鐘快取
+
+  async search({ query, limit = 20 }: SearchOptions): Promise<SkillInfo[]> {
+    const allSkills: SkillInfo[] = [];
+
+    for (const repo of AWESOME_REPOS) {
+      const skills = await this.fetchSkillsFromRepo(repo);
+      allSkills.push(...skills);
+    }
+
+    // 篩選符合 query 的
+    const matched = allSkills.filter(s =>
+      s.name.toLowerCase().includes(query.toLowerCase()) ||
+      s.description?.toLowerCase().includes(query.toLowerCase())
     );
 
-    // 合併結果
-    const skills: SkillInfo[] = [];
-    const status: Record<string, 'success' | 'error' | 'disabled'> = {};
-
-    results.forEach((result, i) => {
-      const provider = providers[i];
-      if (result.status === 'fulfilled') {
-        skills.push(...result.value);
-        status[provider.id] = 'success';
-      } else {
-        status[provider.id] = 'error';
-      }
-    });
-
-    // 去重 (相同 source 只保留優先級高的)
-    const deduped = this.deduplicateSkills(skills);
-
-    return {
-      skills: deduped.slice(0, options.limit || 20),
-      total: deduped.length,
-      hasMore: deduped.length > (options.limit || 20),
-      providerStatus: status,
-    };
+    return matched.slice(0, limit);
   }
 
-  /**
-   * 去重邏輯
-   */
-  private deduplicateSkills(skills: SkillInfo[]): SkillInfo[] {
-    const seen = new Map<string, SkillInfo>();
-    for (const skill of skills) {
-      // 用 source URL 作為 key
-      const key = skill.source.toLowerCase();
-      if (!seen.has(key)) {
-        seen.set(key, skill);
+  private async fetchSkillsFromRepo(repo: string): Promise<SkillInfo[]> {
+    // 檢查快取
+    const cacheKey = repo;
+    const cached = this.cache.get(cacheKey);
+    if (cached) return cached;
+
+    // 抓取 repo 目錄結構
+    const url = `https://api.github.com/repos/${repo}/contents`;
+    const response = await fetch(url, { headers: this.getHeaders() });
+    const contents = await response.json();
+
+    // 找出所有包含 SKILL.md 的目錄
+    const skills: SkillInfo[] = [];
+    for (const item of contents) {
+      if (item.type === 'dir') {
+        const hasSkill = await this.checkHasSkillMd(repo, item.path);
+        if (hasSkill) {
+          skills.push({
+            name: item.name,
+            description: '',  // 需要 fetch 才能取得
+            source: `github:${repo}#${item.path}`,
+            provider: this.id,
+            found_in: [repo],
+          });
+        }
       }
     }
-    return Array.from(seen.values());
-  }
-}
 
-/**
- * 建立預設的 RegistryManager
- */
-export function createRegistryManager(): RegistryManager {
-  const manager = new RegistryManager();
+    // 快取結果
+    this.cache.set(cacheKey, skills);
+    setTimeout(() => this.cache.delete(cacheKey), this.cacheExpiry);
 
-  // 註冊內建 providers
-  manager.register(new LocalProvider());
-  manager.register(new GitHubProvider());
-  manager.register(new SkillsMarketplaceProvider());
-
-  return manager;
-}
-```
-
-### 3. Providers 實作
-
-#### 3.1 Local Provider
-
-```typescript
-// packages/core/src/registry/providers/local.ts
-
-export class LocalProvider implements RegistryProvider {
-  readonly id = 'local';
-  readonly name = 'Installed Skills';
-  enabled = true;
-  priority = 0;  // 最高優先級
-
-  constructor(private storeManager: StoreManager) {}
-
-  async search(options: SearchOptions): Promise<SkillInfo[]> {
-    const skills = await this.storeManager.listSkills();
-    const query = options.query.toLowerCase();
-
-    return skills
-      .filter(s =>
-        s.name.toLowerCase().includes(query) ||
-        s.description?.toLowerCase().includes(query)
-      )
-      .map(s => ({
-        id: s.name,
-        name: s.name,
-        description: s.description || '',
-        author: '',
-        source: `local:${s.name}`,
-        provider: this.id,
-      }));
-  }
-
-  async getSkill(id: string): Promise<SkillInfo | null> {
-    const skill = await this.storeManager.getSkill(id);
-    if (!skill) return null;
-
-    return {
-      id: skill.name,
-      name: skill.name,
-      description: skill.description,
-      author: typeof skill.author === 'string' ? skill.author : skill.author?.name || '',
-      source: `local:${skill.name}`,
-      provider: this.id,
-    };
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return true;  // 永遠可用
+    return skills;
   }
 }
 ```
 
-#### 3.2 GitHub Provider
+### GitHubProvider (補充用)
 
 ```typescript
 // packages/core/src/registry/providers/github.ts
 
 export class GitHubProvider implements RegistryProvider {
   readonly id = 'github';
-  readonly name = 'GitHub';
-  enabled = true;
-  priority = 10;
 
-  async search(options: SearchOptions): Promise<SkillInfo[]> {
-    // 使用 GitHub Search API
-    // 搜尋包含 SKILL.md 的 repos
-    const query = `${options.query} filename:SKILL.md`;
-    const url = `https://api.github.com/search/code?q=${encodeURIComponent(query)}&per_page=20`;
+  async search({ query, limit = 20 }: SearchOptions): Promise<SkillInfo[]> {
+    // 使用 topic 搜尋而非 filename
+    const searchQuery = `${query} topic:claude-skill OR topic:skillpkg-skill`;
+    const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${limit}`;
 
-    const response = await fetch(url, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) return [];
-
+    const response = await fetch(url, { headers: this.getHeaders() });
     const data = await response.json();
 
-    return data.items.map((item: any) => ({
-      id: `${item.repository.full_name}#${item.path}`,
-      name: item.repository.name,
-      description: item.repository.description || '',
-      author: item.repository.owner.login,
-      source: this.toSource(item.repository.full_name, item.path),
-      stars: item.repository.stargazers_count,
+    return data.items?.map((repo: any) => ({
+      name: repo.name,
+      description: repo.description || '',
+      source: `github:${repo.full_name}`,
+      stars: repo.stargazers_count,
+      forks: repo.forks_count,
+      last_updated: repo.pushed_at,
+      author: repo.owner.login,
       provider: this.id,
-    }));
-  }
-
-  /**
-   * 轉換為可安裝的 source URL
-   */
-  private toSource(repo: string, path: string): string {
-    // path: "docs/skills/my-skill/SKILL.md"
-    // 移除 SKILL.md 取得目錄
-    const dir = path.replace(/\/SKILL\.md$/i, '');
-    if (dir && dir !== path) {
-      return `github:${repo}#${dir}`;
-    }
-    return `github:${repo}`;
-  }
-
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'skillpkg',
-    };
-    if (process.env.GITHUB_TOKEN) {
-      headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
-    }
-    return headers;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    try {
-      const response = await fetch('https://api.github.com/rate_limit', {
-        headers: this.getHeaders(),
-      });
-      const data = await response.json();
-      return data.resources?.search?.remaining > 0;
-    } catch {
-      return false;
-    }
+    })) || [];
   }
 }
 ```
 
-#### 3.3 Skills Marketplace Provider
+### SkillsmpProvider (可選，需 API Key)
 
 ```typescript
 // packages/core/src/registry/providers/skillsmp.ts
 
-const API_BASE = 'https://skillsmp.com/api/skills';
-
-export class SkillsMarketplaceProvider implements RegistryProvider {
+export class SkillsmpProvider implements RegistryProvider {
   readonly id = 'skillsmp';
-  readonly name = 'Skills Marketplace';
-  enabled = true;
-  priority = 5;
+  private apiKey: string | null = null;
+  private cache: Map<string, SkillInfo[]> = new Map();
+  private cacheExpiry: number = 5 * 60 * 1000; // 5 分鐘快取
 
-  async search(options: SearchOptions): Promise<SkillInfo[]> {
-    const params = new URLSearchParams();
-    if (options.query) params.set('q', options.query);
-    if (options.category) params.set('category', options.category);
-    if (options.sort) params.set('sort', options.sort);
-    if (options.limit) params.set('limit', String(options.limit));
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey || null;
+  }
 
-    const url = `${API_BASE}?${params}`;
-    const response = await fetch(url);
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
 
-    if (!response.ok) return [];
+  async search({ query, limit = 20 }: SearchOptions): Promise<SkillInfo[]> {
+    if (!this.apiKey) {
+      throw new Error('Skillsmp API key not configured. Run: skillpkg config set skillsmp.apiKey YOUR_KEY');
+    }
+
+    // 檢查快取
+    const cacheKey = `${query}:${limit}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) return cached;
+
+    const url = `https://skillsmp.com/api/v1/skills/search?q=${encodeURIComponent(query)}&limit=${limit}`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Skillsmp API error: ${response.status}`);
+    }
 
     const data = await response.json();
-
-    return data.skills.map((s: any) => ({
-      id: s.id,
+    const skills: SkillInfo[] = data.skills?.map((s: any) => ({
       name: s.name,
-      description: s.description,
+      description: s.description || '',
+      source: s.github_url ? `github:${this.extractGithubPath(s.github_url)}` : `skillsmp:${s.id}`,
+      stars: s.stars || 0,
       author: s.author,
-      source: this.toSource(s.repo, s.path),
-      stars: s.stars,
-      updatedAt: s.updatedAt,
       provider: this.id,
-    }));
+    })) || [];
+
+    // 快取結果
+    this.cache.set(cacheKey, skills);
+    setTimeout(() => this.cache.delete(cacheKey), this.cacheExpiry);
+
+    return skills;
   }
 
-  private toSource(repo: string, path?: string): string {
-    // repo: "https://github.com/user/repo"
-    const match = repo.match(/github\.com\/([^\/]+\/[^\/]+)/);
-    if (!match) return repo;
-
-    const userRepo = match[1];
-    if (path) {
-      return `github:${userRepo}#${path}`;
-    }
-    return `github:${userRepo}`;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    try {
-      const response = await fetch(API_BASE + '?limit=1');
-      return response.ok;
-    } catch {
-      return false;
-    }
+  private extractGithubPath(url: string): string {
+    // https://github.com/user/repo → user/repo
+    const match = url.match(/github\.com\/([^\/]+\/[^\/]+)/);
+    return match ? match[1] : url;
   }
 }
 ```
 
-### 4. Fetcher 子目錄支援
-
-#### 4.1 擴展 source-parser.ts
+### Registry Manager (含去重與自動來源選擇)
 
 ```typescript
-export interface ParsedSource {
-  type: SourceType;
-  value: string;
-  subpath?: string;  // 新增
-  original: string;
-}
+// packages/core/src/registry/manager.ts
 
-export function parseSource(source: string): ParsedSource {
-  // github:user/repo#path/to/skill
-  if (source.startsWith('github:')) {
-    const rest = source.slice(7);
+export class RegistryManager {
+  private providers: Map<string, RegistryProvider> = new Map();
 
-    // 檢查 # 分隔符
-    const hashIndex = rest.indexOf('#');
-    if (hashIndex !== -1) {
-      return {
-        type: 'github',
-        value: rest.slice(0, hashIndex),
-        subpath: rest.slice(hashIndex + 1),
-        original: source,
-      };
+  // 自動決定使用哪些來源
+  private getDefaultSources(): string[] {
+    const skillsmp = this.providers.get('skillsmp') as SkillsmpProvider;
+
+    // 有 API Key → skillsmp，無 → awesome (fallback)
+    if (skillsmp?.isConfigured()) {
+      return ['local', 'skillsmp'];
     }
+    return ['local', 'awesome'];
+  }
 
-    // 檢查 user/repo/path 格式 (3+ segments)
-    const parts = rest.split('/');
-    if (parts.length > 2) {
-      return {
-        type: 'github',
-        value: `${parts[0]}/${parts[1]}`,
-        subpath: parts.slice(2).join('/'),
-        original: source,
-      };
-    }
+  async search(
+    options: SearchOptions,
+    sources?: string[]
+  ): Promise<SearchResult> {
+    // 自動選擇來源（若未指定）
+    const effectiveSources = sources || this.getDefaultSources();
+
+    const activeProviders = effectiveSources
+      .map(s => this.providers.get(s))
+      .filter(Boolean) as RegistryProvider[];
+
+    // 並行查詢
+    const results = await Promise.allSettled(
+      activeProviders.map(p => p.search(options))
+    );
+
+    // 收集結果
+    const allSkills: SkillInfo[] = [];
+    const errors: Record<string, string> = {};
+
+    results.forEach((result, i) => {
+      const provider = activeProviders[i];
+      if (result.status === 'fulfilled') {
+        allSkills.push(...result.value);
+      } else {
+        errors[provider.id] = result.reason?.message || 'Unknown error';
+      }
+    });
+
+    // 去重
+    const beforeCount = allSkills.length;
+    const deduplicated = this.deduplicateSkills(allSkills);
+    const duplicatesRemoved = beforeCount - deduplicated.length;
 
     return {
-      type: 'github',
-      value: rest,
-      original: source,
+      skills: deduplicated.slice(0, options.limit || 20),
+      sources_queried: sources,
+      duplicates_removed: duplicatesRemoved,
+      errors: Object.keys(errors).length > 0 ? errors : undefined,
     };
   }
 
-  // user/repo#path 格式
-  if (/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+/.test(source)) {
-    const hashIndex = source.indexOf('#');
-    if (hashIndex !== -1) {
-      return {
-        type: 'github',
-        value: source.slice(0, hashIndex),
-        subpath: source.slice(hashIndex + 1),
-        original: source,
-      };
+  private deduplicateSkills(skills: SkillInfo[]): SkillInfo[] {
+    const seen = new Map<string, SkillInfo>();
+
+    for (const skill of skills) {
+      const key = this.normalizeSource(skill.source);
+
+      if (seen.has(key)) {
+        // 合併 found_in 資訊
+        const existing = seen.get(key)!;
+        existing.found_in = [
+          ...(existing.found_in || []),
+          ...(skill.found_in || []),
+        ];
+      } else {
+        seen.set(key, { ...skill });
+      }
     }
+
+    return Array.from(seen.values());
   }
 
-  // ... 其他格式保持不變
-}
-
-export function normalizeSource(source: string): string {
-  const parsed = parseSource(source);
-
-  if (parsed.type === 'github') {
-    if (parsed.subpath) {
-      return `github:${parsed.value}#${parsed.subpath}`;
-    }
-    return `github:${parsed.value}`;
+  private normalizeSource(source: string): string {
+    return source.toLowerCase().replace(/\/+$/, '');
   }
-
-  // ... 其他格式
 }
 ```
 
-#### 4.2 修改 fetcher.ts
+## CLI 設計
 
 ```typescript
-async function fetchFromGitHub(
-  repo: string,
-  options: FetcherOptions
-): Promise<Skill | null> {
-  const parsed = parseSource(`github:${repo}`);
-  const token = options.githubToken || process.env.GITHUB_TOKEN;
+// packages/cli/src/commands/search.ts
 
-  let skillFile: string;
-
-  if (parsed.subpath) {
-    // 直接使用指定路徑
-    skillFile = `${parsed.subpath}/SKILL.md`;
-  } else {
-    // 使用現有的 detectSkillMd
-    const detection = await detectSkillMd(parsed.value, token);
-    if (!detection.hasSkill || !detection.skillFile) {
-      return null;
-    }
-    skillFile = detection.skillFile;
-  }
-
-  const rawUrl = `https://raw.githubusercontent.com/${parsed.value}/HEAD/${skillFile}`;
-  // ... 其餘不變
-}
-```
-
-## CLI 命令設計
-
-```typescript
-// skillpkg search <query> [options]
 program
   .command('search <query>')
-  .description('Search for skills in registries')
-  .option('-r, --registry <name>', 'Search specific registry only')
-  .option('-c, --category <name>', 'Filter by category')
-  .option('-s, --sort <field>', 'Sort by: stars, updated, relevance')
-  .option('-l, --limit <n>', 'Limit results', '10')
-  .action(searchCommand);
+  .description('Search for skills')
+  .option('-s, --source <sources>', 'Sources: local,awesome,github', 'local,awesome')
+  .option('-l, --limit <n>', 'Max results', '20')
+  .action(async (query, options) => {
+    const sources = options.source.split(',');
+    const { skills, duplicates_removed, errors } = await manager.search(
+      { query, limit: parseInt(options.limit) },
+      sources
+    );
+
+    console.log(`\nFound ${skills.length} skills (${duplicates_removed} duplicates removed):\n`);
+
+    for (const skill of skills) {
+      console.log(`  ${skill.name}${skill.stars ? ` ⭐${skill.stars}` : ''}`);
+      if (skill.description) {
+        console.log(`  ${skill.description.slice(0, 60)}...`);
+      }
+      console.log(`  ${chalk.cyan(skill.source)}`);
+      if (skill.found_in && skill.found_in.length > 1) {
+        console.log(`  ${chalk.gray(`Also in: ${skill.found_in.slice(1).join(', ')}`)}`);
+      }
+      console.log();
+    }
+
+    console.log(`Install: ${chalk.green('skillpkg install <source>')}`);
+  });
 ```
 
-## MCP 工具設計
+**輸出範例：**
+```
+$ skillpkg search "git"
 
-```typescript
-{
-  name: 'search_skills',
-  description: 'Search for skills across all registries',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'Search keywords' },
-      registry: { type: 'string', description: 'Specific registry (local, github, skillsmp)' },
-      limit: { type: 'number', default: 10 }
-    },
-    required: ['query']
-  }
-}
+Found 8 skills (3 duplicates removed):
+
+  git-helper  ⭐120
+  Git operations and commit message helper
+  github:alice/tools#git-helper
+  Also in: travisvn/awesome-claude-skills
+
+  conventional-commits  ⭐85
+  Conventional commit format enforcer
+  github:bob/commits
+
+  ...
+
+Install: skillpkg install <source>
 ```
 
-## 向後相容
+## 使用流程
 
-| 現有功能 | 影響 |
-|----------|------|
-| `github:user/repo` | ✅ 完全相容 |
-| `user/repo` | ✅ 完全相容 |
-| 新增 `#path` 語法 | ✅ 擴展功能 |
+### AI 典型流程
+
+```
+1. 用戶：「我需要一個幫我寫 commit message 的 skill」
+
+2. AI 呼叫 search_skills({ query: "git commit" })
+   → 搜尋 local + awesome (預設)
+   → 自動去重
+   → 返回 5 個結果
+
+3. AI 看到 git-helper 出現在多個 awesome repos
+   → 呼叫 fetch_skill_content({ source: "github:alice/tools#git-helper" })
+   → 讀取 SKILL.md 分析
+
+4. AI 決定：
+   A. 符合需求 → install_skill
+   B. 需要改造 → 參考建新
+   C. 不符合 → 繼續搜尋或用 github source 擴大範圍
+```
+
+## 快取策略
+
+| 來源 | 快取時間 | 原因 |
+|------|----------|------|
+| local | 無 | 即時讀取 |
+| skillsmp | 5 分鐘 | 主要來源，API 限制 |
+| awesome | 30 分鐘 | Fallback，內容穩定 |
+| github | 5 分鐘 | 補充，結果可能變化 |
