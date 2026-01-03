@@ -72,7 +72,8 @@ function createMockFetcher(): SkillFetcherAdapter {
       const meta = mockMetadata[source];
       if (!meta) return null;
       const skill = mockSkills[meta.name];
-      return skill || null;
+      if (!skill) return null;
+      return { skill };
     },
   };
 }

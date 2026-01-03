@@ -145,6 +145,8 @@ export interface SkillContent {
   bodyContent: string;
   /** Parsed frontmatter */
   frontmatter: Record<string, unknown>;
+  /** Source directory path (for copying additional files) */
+  sourcePath?: string;
 }
 
 /**

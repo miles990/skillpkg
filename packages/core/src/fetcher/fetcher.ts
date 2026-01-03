@@ -8,11 +8,11 @@ import { existsSync } from 'fs';
 import { join, resolve } from 'path';
 import matter from 'gray-matter';
 import type { Skill } from '../types.js';
-import type { FetchResult, FetcherOptions, ParsedSource } from './types.js';
+import type { FetchResult, FetcherOptions, ParsedSource, SkillFile } from './types.js';
 import { parseSource, normalizeSource } from './source-parser.js';
 import { detectSkillMd } from '../github/search.js';
 import type { SkillFetcher, SkillMetadata } from '../resolver/types.js';
-import type { SkillFetcherAdapter } from '../installer/types.js';
+import type { SkillFetcherAdapter, SkillFetchResult } from '../installer/types.js';
 
 /**
  * Fetch a skill from any supported source
@@ -23,9 +23,9 @@ export async function fetchSkill(
 ): Promise<FetchResult> {
   try {
     const parsed = parseSource(source);
-    const skill = await fetchByType(parsed, options);
+    const result = await fetchByType(parsed, options);
 
-    if (!skill) {
+    if (!result.skill) {
       return {
         success: false,
         error: `Failed to fetch skill from: ${source}`,
@@ -34,7 +34,8 @@ export async function fetchSkill(
 
     return {
       success: true,
-      skill,
+      skill: result.skill,
+      files: result.files.length > 0 ? result.files : undefined,
       sourceUrl: normalizeSource(source),
     };
   } catch (error) {
@@ -46,26 +47,176 @@ export async function fetchSkill(
 }
 
 /**
+ * Fetch result with skill and optional files
+ */
+interface InternalFetchResult {
+  skill: Skill | null;
+  files: SkillFile[];
+}
+
+/**
  * Fetch skill by parsed source type
  */
 async function fetchByType(
   parsed: ParsedSource,
   options: FetcherOptions
-): Promise<Skill | null> {
+): Promise<InternalFetchResult> {
   switch (parsed.type) {
     case 'github':
       return fetchFromGitHub(parsed.value, parsed.subpath, options);
-    case 'gist':
-      return fetchFromGist(parsed.value, options);
-    case 'url':
-      return fetchFromUrl(parsed.value, options);
+    case 'gist': {
+      const skill = await fetchFromGist(parsed.value, options);
+      return { skill, files: [] };
+    }
+    case 'url': {
+      const skill = await fetchFromUrl(parsed.value, options);
+      return { skill, files: [] };
+    }
     case 'local':
       return fetchFromLocal(parsed.value);
-    case 'pack':
-      return fetchFromPack(parsed.value);
+    case 'pack': {
+      const skill = await fetchFromPack(parsed.value);
+      return { skill, files: [] };
+    }
     default:
-      return null;
+      return { skill: null, files: [] };
   }
+}
+
+/**
+ * GitHub Contents API response item
+ */
+interface GitHubContentItem {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  size?: number;
+}
+
+/**
+ * List all files in a GitHub directory recursively
+ */
+async function listGitHubDirectory(
+  repo: string,
+  path: string,
+  token?: string
+): Promise<string[]> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3+json',
+    'User-Agent': 'skillpkg',
+  };
+  if (token) {
+    headers.Authorization = `token ${token}`;
+  }
+
+  const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+
+  try {
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      return [];
+    }
+
+    const items = await response.json() as GitHubContentItem[];
+    if (!Array.isArray(items)) {
+      return [];
+    }
+
+    const files: string[] = [];
+
+    for (const item of items) {
+      if (item.type === 'file') {
+        // Skip SKILL.md (handled separately) and files > 1MB
+        if (item.name.toLowerCase() !== 'skill.md' && (item.size ?? 0) <= 1024 * 1024) {
+          files.push(item.path);
+        }
+      } else if (item.type === 'dir') {
+        // Recursively list subdirectories
+        const subFiles = await listGitHubDirectory(repo, item.path, token);
+        files.push(...subFiles);
+      }
+    }
+
+    return files;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Download multiple files from GitHub in parallel
+ */
+async function downloadGitHubFiles(
+  repo: string,
+  basePath: string,
+  filePaths: string[],
+  token?: string
+): Promise<SkillFile[]> {
+  const headers: Record<string, string> = {
+    'User-Agent': 'skillpkg',
+  };
+  if (token) {
+    headers.Authorization = `token ${token}`;
+  }
+
+  // Binary file extensions
+  const binaryExtensions = new Set([
+    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.svg',
+    '.woff', '.woff2', '.ttf', '.eot',
+    '.zip', '.tar', '.gz', '.7z',
+    '.pdf', '.doc', '.docx',
+    '.exe', '.dll', '.so', '.dylib',
+  ]);
+
+  const isBinary = (path: string): boolean => {
+    const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
+    return binaryExtensions.has(ext);
+  };
+
+  const downloadFile = async (filePath: string): Promise<SkillFile | null> => {
+    const rawUrl = `https://raw.githubusercontent.com/${repo}/HEAD/${filePath}`;
+
+    try {
+      const response = await fetch(rawUrl, { headers });
+      if (!response.ok) {
+        return null;
+      }
+
+      // Calculate relative path from basePath
+      const relativePath = filePath.startsWith(basePath + '/')
+        ? filePath.slice(basePath.length + 1)
+        : filePath;
+
+      if (isBinary(filePath)) {
+        const buffer = await response.arrayBuffer();
+        return {
+          path: relativePath,
+          content: Buffer.from(buffer).toString('base64'),
+          binary: true,
+        };
+      } else {
+        const content = await response.text();
+        return {
+          path: relativePath,
+          content,
+        };
+      }
+    } catch {
+      return null;
+    }
+  };
+
+  // Download all files in parallel (max 10 concurrent)
+  const results: SkillFile[] = [];
+  const batchSize = 10;
+
+  for (let i = 0; i < filePaths.length; i += batchSize) {
+    const batch = filePaths.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(downloadFile));
+    results.push(...batchResults.filter((f): f is SkillFile => f !== null));
+  }
+
+  return results;
 }
 
 /**
@@ -79,24 +230,30 @@ async function fetchFromGitHub(
   repo: string,
   subpath: string | undefined,
   options: FetcherOptions
-): Promise<Skill | null> {
+): Promise<{ skill: Skill | null; files: SkillFile[] }> {
   const token = options.githubToken || process.env.GITHUB_TOKEN;
 
   let skillFile: string;
+  let skillDir: string;
 
   if (subpath) {
     // Direct subpath provided: use {subpath}/SKILL.md
     skillFile = `${subpath}/SKILL.md`;
+    skillDir = subpath;
   } else {
     // No subpath: detect SKILL.md location in repo root
     const detection = await detectSkillMd(repo, token);
     if (!detection.hasSkill || !detection.skillFile) {
-      return null;
+      return { skill: null, files: [] };
     }
     skillFile = detection.skillFile;
+    // Extract directory from skill file path
+    skillDir = skillFile.includes('/')
+      ? skillFile.substring(0, skillFile.lastIndexOf('/'))
+      : '';
   }
 
-  // Fetch raw content
+  // Fetch SKILL.md content
   const rawUrl = `https://raw.githubusercontent.com/${repo}/HEAD/${skillFile}`;
   const headers: Record<string, string> = {
     'User-Agent': 'skillpkg',
@@ -105,16 +262,34 @@ async function fetchFromGitHub(
     headers['Authorization'] = `token ${token}`;
   }
 
+  let skill: Skill | null = null;
+
   try {
     const response = await fetch(rawUrl, { headers });
     if (!response.ok) {
-      return null;
+      return { skill: null, files: [] };
     }
     const content = await response.text();
-    return parseSkillMd(content);
+    skill = parseSkillMd(content);
   } catch {
-    return null;
+    return { skill: null, files: [] };
   }
+
+  if (!skill) {
+    return { skill: null, files: [] };
+  }
+
+  // Fetch additional files from the skill directory
+  let files: SkillFile[] = [];
+
+  if (skillDir) {
+    const filePaths = await listGitHubDirectory(repo, skillDir, token);
+    if (filePaths.length > 0) {
+      files = await downloadGitHubFiles(repo, skillDir, filePaths, token);
+    }
+  }
+
+  return { skill, files };
 }
 
 /**
@@ -192,9 +367,88 @@ async function fetchFromUrl(
 }
 
 /**
+ * List all files in a local directory recursively
+ */
+async function listLocalDirectory(dirPath: string): Promise<string[]> {
+  const { readdir } = await import('fs/promises');
+
+  const files: string[] = [];
+
+  try {
+    const entries = await readdir(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = join(dirPath, entry.name);
+
+      if (entry.isFile()) {
+        // Skip SKILL.md (handled separately)
+        if (entry.name.toLowerCase() !== 'skill.md') {
+          files.push(fullPath);
+        }
+      } else if (entry.isDirectory()) {
+        const subFiles = await listLocalDirectory(fullPath);
+        files.push(...subFiles);
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return files;
+}
+
+/**
+ * Read local files and create SkillFile array
+ */
+async function readLocalFiles(basePath: string, filePaths: string[]): Promise<SkillFile[]> {
+  // Binary file extensions
+  const binaryExtensions = new Set([
+    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.svg',
+    '.woff', '.woff2', '.ttf', '.eot',
+    '.zip', '.tar', '.gz', '.7z',
+    '.pdf', '.doc', '.docx',
+    '.exe', '.dll', '.so', '.dylib',
+  ]);
+
+  const isBinary = (path: string): boolean => {
+    const ext = path.substring(path.lastIndexOf('.')).toLowerCase();
+    return binaryExtensions.has(ext);
+  };
+
+  const files: SkillFile[] = [];
+
+  for (const filePath of filePaths) {
+    try {
+      const relativePath = filePath.startsWith(basePath + '/')
+        ? filePath.slice(basePath.length + 1)
+        : filePath.replace(basePath, '').replace(/^\//, '');
+
+      if (isBinary(filePath)) {
+        const content = await readFile(filePath);
+        files.push({
+          path: relativePath,
+          content: content.toString('base64'),
+          binary: true,
+        });
+      } else {
+        const content = await readFile(filePath, 'utf-8');
+        files.push({
+          path: relativePath,
+          content,
+        });
+      }
+    } catch {
+      // Skip files that can't be read
+    }
+  }
+
+  return files;
+}
+
+/**
  * Fetch skill from local path
  */
-async function fetchFromLocal(path: string): Promise<Skill | null> {
+async function fetchFromLocal(path: string): Promise<InternalFetchResult> {
   const resolvedPath = resolve(path);
 
   // Check for SKILL.md in directory
@@ -204,6 +458,9 @@ async function fetchFromLocal(path: string): Promise<Skill | null> {
     resolvedPath, // Maybe it's the file itself
   ];
 
+  let skill: Skill | null = null;
+  let skillDir: string = '';
+
   for (const skillPath of skillMdPaths) {
     if (existsSync(skillPath)) {
       try {
@@ -212,14 +469,35 @@ async function fetchFromLocal(path: string): Promise<Skill | null> {
           continue;
         }
         const content = await readFile(skillPath, 'utf-8');
-        return parseSkillMd(content);
+        skill = parseSkillMd(content);
+        if (skill) {
+          // Extract directory containing SKILL.md
+          skillDir = skillPath.includes('/')
+            ? skillPath.substring(0, skillPath.lastIndexOf('/'))
+            : resolvedPath;
+          break;
+        }
       } catch {
         continue;
       }
     }
   }
 
-  return null;
+  if (!skill) {
+    return { skill: null, files: [] };
+  }
+
+  // Read additional files from the skill directory
+  let files: SkillFile[] = [];
+
+  if (skillDir && existsSync(skillDir)) {
+    const filePaths = await listLocalDirectory(skillDir);
+    if (filePaths.length > 0) {
+      files = await readLocalFiles(skillDir, filePaths);
+    }
+  }
+
+  return { skill, files };
 }
 
 /**
@@ -309,9 +587,13 @@ export function createSkillFetcherAdapter(options: FetcherOptions = {}): SkillFe
         dependencies: meta.dependencies,
       };
     },
-    async fetchSkill(source: string): Promise<Skill | null> {
+    async fetchSkill(source: string): Promise<SkillFetchResult | null> {
       const result = await fetchSkill(source, options);
-      return result.success ? result.skill || null : null;
+      if (!result.success || !result.skill) return null;
+      return {
+        skill: result.skill,
+        files: result.files,
+      };
     },
   };
 }

@@ -3,8 +3,10 @@
  */
 import { mkdir, readFile, writeFile, rm, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
+import { join, dirname } from 'path';
 import matter from 'gray-matter';
 import type { Skill, Registry, Config, SkillEntry } from '../types.js';
+import type { SkillFile } from '../fetcher/types.js';
 import {
   getGlobalDir,
   getLocalDir,
@@ -152,9 +154,13 @@ export class StoreManager {
    */
   async addSkill(
     skill: Skill,
-    options: { source?: 'registry' | 'local' | 'import'; sourceUrl?: string } = {}
+    options: {
+      source?: 'registry' | 'local' | 'import';
+      sourceUrl?: string;
+      files?: SkillFile[];
+    } = {}
   ): Promise<void> {
-    const { source = 'local', sourceUrl } = options;
+    const { source = 'local', sourceUrl, files = [] } = options;
 
     // Create skill directory
     const skillDir = getSkillDir(this.storeDir, skill.name);
@@ -164,6 +170,25 @@ export class StoreManager {
     const skillPath = getSkillMdPath(this.storeDir, skill.name);
     const content = this.skillToMarkdown(skill);
     await writeFile(skillPath, content, 'utf-8');
+
+    // Write additional files
+    for (const file of files) {
+      const filePath = join(skillDir, file.path);
+      const fileDir = dirname(filePath);
+
+      // Create subdirectory if needed
+      if (fileDir !== skillDir) {
+        await mkdir(fileDir, { recursive: true });
+      }
+
+      // Write file content
+      if (file.binary) {
+        const buffer = Buffer.from(file.content, 'base64');
+        await writeFile(filePath, buffer);
+      } else {
+        await writeFile(filePath, file.content, 'utf-8');
+      }
+    }
 
     // Update registry
     await addSkillToRegistry(this.storeDir, skill.name, {

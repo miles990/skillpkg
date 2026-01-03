@@ -1,7 +1,7 @@
 /**
  * Syncer - Sync skills to AI tool directories
  */
-import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
+import { readFile, writeFile, mkdir, readdir, rm, cp } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, relative } from 'path';
 import { createHash } from 'crypto';
@@ -198,7 +198,7 @@ export class Syncer {
       // Transform content for target
       const content = this.transformForTarget(skill, targetConfig);
 
-      // Check if file needs updating
+      // Check if SKILL.md needs updating
       const action = await this.getFileAction(skillFile, content, options);
 
       if (action === 'unchanged') {
@@ -207,12 +207,66 @@ export class Syncer {
       }
 
       if (!options.dryRun) {
-        await mkdir(skillDir, { recursive: true });
-        await writeFile(skillFile, content, 'utf-8');
+        // If source path exists, copy entire directory
+        if (skill.sourcePath && existsSync(skill.sourcePath)) {
+          // Remove existing target directory first (to clean up stale files)
+          if (existsSync(skillDir)) {
+            await rm(skillDir, { recursive: true });
+          }
+          // Copy entire source directory
+          await cp(skill.sourcePath, skillDir, { recursive: true });
+
+          // Apply target-specific transformation to SKILL.md if needed
+          if (targetConfig.frontmatter !== 'keep') {
+            await writeFile(skillFile, content, 'utf-8');
+          }
+
+          // Count additional files copied
+          const additionalFiles = await this.countAdditionalFiles(skillDir, targetConfig.skillFileName);
+          if (additionalFiles > 0) {
+            result.files.push({
+              path: relative(projectPath, skillDir),
+              action,
+              skillName: name,
+            });
+          }
+        } else {
+          // No source path, just write SKILL.md
+          await mkdir(skillDir, { recursive: true });
+          await writeFile(skillFile, content, 'utf-8');
+        }
       }
 
       result.files.push({ path: relativePath, action, skillName: name });
     }
+  }
+
+  /**
+   * Count additional files in a skill directory (excluding SKILL.md)
+   */
+  private async countAdditionalFiles(dir: string, skillFileName: string): Promise<number> {
+    let count = 0;
+
+    const countRecursive = async (currentDir: string): Promise<void> => {
+      const entries = await readdir(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile()) {
+          if (entry.name.toLowerCase() !== skillFileName.toLowerCase()) {
+            count++;
+          }
+        } else if (entry.isDirectory()) {
+          await countRecursive(join(currentDir, entry.name));
+        }
+      }
+    };
+
+    try {
+      await countRecursive(dir);
+    } catch {
+      // Ignore errors
+    }
+
+    return count;
   }
 
   /**
@@ -299,7 +353,7 @@ export class Syncer {
   private async cleanupOrphans(
     outputDir: string,
     skills: Map<string, SkillContent>,
-    targetConfig: TargetConfig,
+    _targetConfig: TargetConfig,
     result: TargetSyncResult
   ): Promise<void> {
     if (!existsSync(outputDir)) return;
@@ -315,26 +369,16 @@ export class Syncer {
         // Skip if skill exists in current list
         if (skills.has(skillName)) continue;
 
-        // This is an orphan - delete it
+        // This is an orphan - delete entire directory
         const skillDir = join(outputDir, skillName);
-        const skillFile = join(skillDir, targetConfig.skillFileName);
 
-        if (existsSync(skillFile)) {
-          await unlink(skillFile);
+        try {
+          await rm(skillDir, { recursive: true });
           result.files.push({
-            path: relative(outputDir, skillFile),
+            path: relative(outputDir, skillDir),
             action: 'deleted',
             skillName,
           });
-        }
-
-        // Try to remove empty directory
-        try {
-          const remaining = await readdir(skillDir);
-          if (remaining.length === 0) {
-            const { rmdir } = await import('fs/promises');
-            await rmdir(skillDir);
-          }
         } catch {
           // Ignore errors when removing directory
         }
@@ -485,6 +529,8 @@ export async function loadSkillsFromDirectory(
 
     try {
       const skill = await loadSkillContent(skillFile);
+      // Add source path for copying additional files
+      skill.sourcePath = skillDir;
       skills.set(entry.name, skill);
     } catch {
       // Skip invalid skill files

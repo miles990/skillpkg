@@ -21,11 +21,25 @@ export interface ParsedSource {
 }
 
 /**
+ * Additional file in a skill directory (scripts, resources, etc.)
+ */
+export interface SkillFile {
+  /** Relative path within skill directory (e.g., "scripts/setup.sh") */
+  path: string;
+  /** File content (string for text, base64 for binary) */
+  content: string;
+  /** Whether content is base64-encoded binary */
+  binary?: boolean;
+}
+
+/**
  * Fetch result
  */
 export interface FetchResult {
   success: boolean;
   skill?: Skill;
+  /** Additional files in the skill directory */
+  files?: SkillFile[];
   error?: string;
   /** Source URL for tracking */
   sourceUrl?: string;

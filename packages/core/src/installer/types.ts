@@ -2,6 +2,7 @@
  * Installer types - Dependency-aware skill installation
  */
 import type { Skill } from '../types.js';
+import type { SkillFile } from '../fetcher/types.js';
 
 /**
  * Installation source types
@@ -105,6 +106,14 @@ export interface UninstallResult {
 }
 
 /**
+ * Skill fetch result with optional files
+ */
+export interface SkillFetchResult {
+  skill: Skill;
+  files?: SkillFile[];
+}
+
+/**
  * Skill fetcher interface for dependency resolution
  */
 export interface SkillFetcherAdapter {
@@ -118,8 +127,8 @@ export interface SkillFetcherAdapter {
     };
   } | null>;
 
-  /** Fetch full skill from source */
-  fetchSkill(source: string): Promise<Skill | null>;
+  /** Fetch full skill from source (with optional files) */
+  fetchSkill(source: string): Promise<SkillFetchResult | null>;
 }
 
 /**

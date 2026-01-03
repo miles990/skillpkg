@@ -233,9 +233,9 @@ export class Installer {
     step: { name: string; source: string; isTransitive: boolean; requiredBy?: string }
   ): Promise<SkillInstallResult> {
     try {
-      // Fetch the full skill
-      const skill = await this.fetcher.fetchSkill(source);
-      if (!skill) {
+      // Fetch the full skill (with files)
+      const fetchResult = await this.fetcher.fetchSkill(source);
+      if (!fetchResult) {
         return {
           name: step.name,
           version: 'unknown',
@@ -247,15 +247,21 @@ export class Installer {
         };
       }
 
+      const { skill, files } = fetchResult;
+
       // Check if already installed (use skill.name from metadata)
       const existing = await this.storeManager.getSkill(skill.name);
       const action: 'installed' | 'updated' = existing ? 'updated' : 'installed';
 
-      // Add/update in store
+      // Add/update in store (with files)
       if (existing) {
         await this.storeManager.updateSkill(skill.name, skill);
       } else {
-        await this.storeManager.addSkill(skill, { source: 'registry', sourceUrl: source });
+        await this.storeManager.addSkill(skill, {
+          source: 'registry',
+          sourceUrl: source,
+          files,
+        });
       }
 
       // Record in state (use skill.name from metadata for consistency)
