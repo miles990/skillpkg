@@ -4,8 +4,8 @@
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
+import matter from 'gray-matter';
 import {
-  parse,
   createRegistryClient,
   createExporter,
   isAuthenticated,
@@ -37,29 +37,34 @@ export async function publishCommand(options: PublishCommandOptions): Promise<vo
     process.exit(1);
   }
 
-  // Find skill.yaml
-  const skillPath = resolve(process.cwd(), 'skill.yaml');
+  // Find SKILL.md
+  const skillPath = resolve(process.cwd(), 'SKILL.md');
   if (!existsSync(skillPath)) {
-    logger.error('No skill.yaml found in current directory');
-    logger.log(`Run ${colors.cyan('skillpkg init')} to create one`);
+    logger.error('No SKILL.md found in current directory');
+    logger.log(`Run ${colors.cyan('skillpkg new <name>')} to create one`);
     process.exit(1);
   }
 
-  // Parse skill.yaml
+  // Parse SKILL.md
   let skill: Skill;
   try {
     const content = await readFile(skillPath, 'utf-8');
-    const result = parse(content);
+    const { data, content: body } = matter(content);
 
-    if (!result.success || !result.data) {
-      logger.error('Failed to parse skill.yaml:');
-      result.errors?.forEach((e) => logger.error(`  ${e.message}`));
+    if (!data.name) {
+      logger.error('Failed to parse SKILL.md: missing name in frontmatter');
       process.exit(1);
     }
 
-    skill = result.data;
+    skill = {
+      schema: '1.0',
+      name: data.name as string,
+      version: (data.version as string) || '1.0.0',
+      description: (data.description as string) || '',
+      instructions: body.trim(),
+    };
   } catch (error) {
-    logger.error(`Failed to read skill.yaml: ${error instanceof Error ? error.message : error}`);
+    logger.error(`Failed to read SKILL.md: ${error instanceof Error ? error.message : error}`);
     process.exit(1);
   }
 
@@ -152,7 +157,7 @@ export async function publishCommand(options: PublishCommandOptions): Promise<vo
           break;
         case 'VERSION_EXISTS':
           logger.error(`Version ${skill.version} already exists`);
-          logger.log('Update the version in skill.yaml and try again');
+          logger.log('Update the version in SKILL.md and try again');
           break;
         case 'AUTH_FAILED':
           logger.error('Permission denied');

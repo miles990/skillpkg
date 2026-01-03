@@ -8,6 +8,7 @@
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import matter from 'gray-matter';
 import type { ToolHandler, ToolResult } from '../types.js';
 import { getStore, successResult, errorResult, validateScope } from './utils.js';
 import {
@@ -36,25 +37,22 @@ async function loadSkillsFromStore(
   const skillsDir = join(storeDir, 'skills');
 
   for (const name of skillNames) {
-    const skillYamlPath = join(skillsDir, name, 'skill.yaml');
+    const skillMdPath = join(skillsDir, name, 'SKILL.md');
 
-    if (!existsSync(skillYamlPath)) {
+    if (!existsSync(skillMdPath)) {
       continue;
     }
 
     try {
-      const rawContent = await readFile(skillYamlPath, 'utf-8');
-
-      // Parse YAML frontmatter-style or direct YAML
-      const { parse } = await import('yaml');
-      const parsed = parse(rawContent);
+      const rawContent = await readFile(skillMdPath, 'utf-8');
+      const { data, content: body } = matter(rawContent);
 
       skills.set(name, {
-        name: parsed.name || name,
-        version: parsed.version || '1.0.0',
+        name: (data.name as string) || name,
+        version: (data.version as string) || '1.0.0',
         rawContent,
-        bodyContent: parsed.instructions || rawContent,
-        frontmatter: parsed,
+        bodyContent: body.trim(),
+        frontmatter: data,
       });
     } catch {
       // Skip invalid skills

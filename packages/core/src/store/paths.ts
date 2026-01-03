@@ -33,10 +33,17 @@ export function getSkillDir(storeDir: string, skillName: string): string {
 }
 
 /**
- * Get the path to a skill.yaml file
+ * Get the path to a SKILL.md file
+ */
+export function getSkillMdPath(storeDir: string, skillName: string): string {
+  return join(getSkillDir(storeDir, skillName), 'SKILL.md');
+}
+
+/**
+ * @deprecated Use getSkillMdPath instead
  */
 export function getSkillYamlPath(storeDir: string, skillName: string): string {
-  return join(getSkillDir(storeDir, skillName), 'skill.yaml');
+  return getSkillMdPath(storeDir, skillName);
 }
 
 /**

@@ -89,7 +89,7 @@ Installs a skill from multiple sources:
   "source": "commit-helper",        // Registry
   "source": "github:user/repo",     // GitHub repo
   "source": "gist:abc123",          // GitHub Gist
-  "source": "https://example.com/skill.yaml", // URL
+  "source": "https://example.com/SKILL.md",   // URL
   "source": "./my-skill",           // Local path
   "scope": "local"                  // "local" | "global"
 }

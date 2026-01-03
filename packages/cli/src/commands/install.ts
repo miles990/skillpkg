@@ -9,11 +9,10 @@
  * - Pack file: skillpkg install skill.skillpkg
  */
 import { existsSync, createReadStream } from 'fs';
-import { readFile } from 'fs/promises';
-import { join, resolve, isAbsolute } from 'path';
+import { resolve, isAbsolute } from 'path';
 import { createGunzip } from 'zlib';
+import matter from 'gray-matter';
 import {
-  parse,
   createInstaller,
   createStateManager,
   createConfigManager,
@@ -21,6 +20,8 @@ import {
   createGlobalStore,
   detectSkillMd,
   fetchSkillMdContent,
+  readSkill,
+  hasSkillMd,
   type Skill,
   type SkillFetcherAdapter,
 } from 'skillpkg-core';
@@ -262,41 +263,28 @@ async function fetchSkillFromSource(source: string): Promise<Skill | null> {
 async function fetchFromLocal(pathArg: string): Promise<Skill | null> {
   const skillPath = isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
 
-  let skillContent: string | null = null;
-  let isSkillMd = false;
-
-  // Check for SKILL.md first
-  for (const mdPath of ['SKILL.md', 'skill.md']) {
-    const fullPath = join(skillPath, mdPath);
-    if (existsSync(fullPath)) {
-      skillContent = await readFile(fullPath, 'utf-8');
-      isSkillMd = true;
-      break;
-    }
+  // Only SKILL.md format is supported
+  if (!hasSkillMd(skillPath)) {
+    return null;
   }
-
-  // Fall back to skill.yaml
-  if (!skillContent) {
-    const yamlPath = existsSync(join(skillPath, 'skill.yaml'))
-      ? join(skillPath, 'skill.yaml')
-      : skillPath.endsWith('.yaml')
-        ? skillPath
-        : join(skillPath, 'skill.yaml');
-
-    if (existsSync(yamlPath)) {
-      skillContent = await readFile(yamlPath, 'utf-8');
-    }
-  }
-
-  if (!skillContent) return null;
 
   try {
-    if (isSkillMd) {
-      return parseSkillMd(skillContent);
-    } else {
-      const result = parse(skillContent);
-      return result.success && result.data ? result.data : null;
-    }
+    const parsed = await readSkill(skillPath);
+    // Convert McpDependency[] to string[] for Skill type compatibility
+    const deps = parsed.metadata.dependencies;
+    const convertedDeps = deps
+      ? {
+          mcp: deps.mcp?.map((m) => m.package),
+        }
+      : undefined;
+    return {
+      schema: '1.0',
+      name: parsed.metadata.name,
+      version: parsed.metadata.version,
+      description: parsed.metadata.description,
+      instructions: parsed.content,
+      dependencies: convertedDeps,
+    };
   } catch {
     return null;
   }
@@ -333,7 +321,8 @@ async function fetchFromPack(packPath: string): Promise<Skill | null> {
 
   return new Promise<Skill | null>((resolvePromise) => {
     extract.on('entry', (header, stream, next) => {
-      if (header.name === 'skill.yaml' || header.name.endsWith('/skill.yaml')) {
+      // Look for SKILL.md in pack file
+      if (header.name === 'SKILL.md' || header.name.endsWith('/SKILL.md')) {
         stream.on('data', (chunk) => chunks.push(chunk));
         stream.on('end', next);
       } else {
@@ -348,39 +337,24 @@ async function fetchFromPack(packPath: string): Promise<Skill | null> {
         return;
       }
 
+      // Parse SKILL.md with gray-matter
       const content = Buffer.concat(chunks).toString('utf-8');
-      const result = parse(content);
-      resolvePromise(result.success && result.data ? result.data : null);
+      try {
+        const { data, content: body } = matter(content);
+        resolvePromise({
+          schema: '1.0',
+          name: (data.name as string) || '',
+          version: (data.version as string) || '1.0.0',
+          description: (data.description as string) || '',
+          instructions: body.trim(),
+        });
+      } catch {
+        resolvePromise(null);
+      }
     });
 
     extract.on('error', () => resolvePromise(null));
 
     createReadStream(fullPath).pipe(createGunzip()).pipe(extract);
   });
-}
-
-/**
- * Parse SKILL.md content to Skill object
- */
-function parseSkillMd(content: string): Skill {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) {
-    throw new Error('Invalid SKILL.md format: missing frontmatter');
-  }
-
-  const { parse: parseYaml } = require('yaml');
-  const frontmatter = parseYaml(match[1]);
-
-  if (!frontmatter.name) {
-    throw new Error('Invalid SKILL.md: missing name in frontmatter');
-  }
-
-  return {
-    schema: '1.0',
-    name: frontmatter.name,
-    version: frontmatter.version || '1.0.0',
-    description: frontmatter.description || frontmatter.metadata?.['short-description'] || '',
-    instructions: match[2],
-    dependencies: frontmatter.dependencies,
-  };
 }

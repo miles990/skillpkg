@@ -116,7 +116,7 @@ export interface PlatformConfig {
 }
 
 /**
- * Main Skill interface - represents a skill.yaml
+ * Main Skill interface - represents a SKILL.md (Markdown with YAML frontmatter)
  */
 export interface Skill {
   /** Schema version (e.g., "1.0") */

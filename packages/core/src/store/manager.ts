@@ -3,14 +3,14 @@
  */
 import { mkdir, readFile, writeFile, rm, readdir } from 'fs/promises';
 import { existsSync } from 'fs';
+import matter from 'gray-matter';
 import type { Skill, Registry, Config, SkillEntry } from '../types.js';
-import { parse, stringify } from '../parser/index.js';
 import {
   getGlobalDir,
   getLocalDir,
   getSkillsDir,
   getSkillDir,
-  getSkillYamlPath,
+  getSkillMdPath,
 } from './paths.js';
 import {
   loadRegistry,
@@ -100,7 +100,7 @@ export class StoreManager {
    * Get a skill by name
    */
   async getSkill(name: string): Promise<Skill | null> {
-    const skillPath = getSkillYamlPath(this.storeDir, name);
+    const skillPath = getSkillMdPath(this.storeDir, name);
 
     if (!existsSync(skillPath)) {
       return null;
@@ -108,13 +108,15 @@ export class StoreManager {
 
     try {
       const content = await readFile(skillPath, 'utf-8');
-      const result = parse(content);
+      const { data, content: body } = matter(content);
 
-      if (!result.success || !result.data) {
-        return null;
-      }
-
-      return result.data;
+      return {
+        schema: '1.0',
+        name: (data.name as string) || name,
+        version: (data.version as string) || '1.0.0',
+        description: (data.description as string) || '',
+        instructions: body.trim(),
+      };
     } catch {
       return null;
     }
@@ -158,9 +160,9 @@ export class StoreManager {
     const skillDir = getSkillDir(this.storeDir, skill.name);
     await mkdir(skillDir, { recursive: true });
 
-    // Write skill.yaml
-    const skillPath = getSkillYamlPath(this.storeDir, skill.name);
-    const content = stringify(skill);
+    // Write SKILL.md with frontmatter
+    const skillPath = getSkillMdPath(this.storeDir, skill.name);
+    const content = this.skillToMarkdown(skill);
     await writeFile(skillPath, content, 'utf-8');
 
     // Update registry
@@ -185,9 +187,9 @@ export class StoreManager {
     // Get existing registry entry
     const entry = await getSkillFromRegistry(this.storeDir, name);
 
-    // Write updated skill.yaml
-    const skillPath = getSkillYamlPath(this.storeDir, name);
-    const content = stringify(skill);
+    // Write updated SKILL.md
+    const skillPath = getSkillMdPath(this.storeDir, name);
+    const content = this.skillToMarkdown(skill);
     await writeFile(skillPath, content, 'utf-8');
 
     // Update registry with new version
@@ -317,6 +319,22 @@ export class StoreManager {
     }
 
     return orphans;
+  }
+
+  /**
+   * Convert a Skill to SKILL.md format
+   */
+  private skillToMarkdown(skill: Skill): string {
+    const frontmatter = {
+      name: skill.name,
+      version: skill.version,
+      description: skill.description,
+    };
+
+    // Convert instructions to markdown content
+    const content = skill.instructions || '';
+
+    return matter.stringify(content, frontmatter);
   }
 }
 

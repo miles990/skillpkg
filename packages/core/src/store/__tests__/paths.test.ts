@@ -9,6 +9,7 @@ import {
   getLocalDir,
   getSkillsDir,
   getSkillDir,
+  getSkillMdPath,
   getSkillYamlPath,
   getRegistryPath,
   getConfigPath,
@@ -51,10 +52,17 @@ describe('paths', () => {
     });
   });
 
-  describe('getSkillYamlPath', () => {
-    it('should return skill.yaml path', () => {
+  describe('getSkillMdPath', () => {
+    it('should return SKILL.md path', () => {
+      const result = getSkillMdPath('/base', 'my-skill');
+      expect(result).toBe(join('/base', 'skills', 'my-skill', 'SKILL.md'));
+    });
+  });
+
+  describe('getSkillYamlPath (deprecated)', () => {
+    it('should return SKILL.md path (backwards compat)', () => {
       const result = getSkillYamlPath('/base', 'my-skill');
-      expect(result).toBe(join('/base', 'skills', 'my-skill', 'skill.yaml'));
+      expect(result).toBe(join('/base', 'skills', 'my-skill', 'SKILL.md'));
     });
   });
 

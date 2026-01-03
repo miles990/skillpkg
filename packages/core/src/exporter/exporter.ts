@@ -7,8 +7,8 @@ import { join } from 'path';
 import { createGzip } from 'zlib';
 import { pipeline } from 'stream/promises';
 import { pack as tarPack } from 'tar-stream';
+import matter from 'gray-matter';
 import type { Skill } from '../types.js';
-import { stringify } from '../parser/index.js';
 import type {
   ExportOptions,
   ExportResult,
@@ -19,6 +19,18 @@ import type {
  * Exporter class
  */
 export class Exporter {
+  /**
+   * Convert a Skill to SKILL.md format (Markdown with YAML frontmatter)
+   */
+  private skillToMarkdown(skill: Skill): string {
+    const frontmatter = {
+      name: skill.name,
+      version: skill.version,
+      description: skill.description,
+    };
+    const content = skill.instructions || '';
+    return matter.stringify(content, frontmatter);
+  }
   /**
    * Export a skill to the specified format
    */
@@ -86,7 +98,7 @@ export class Exporter {
   }
 
   /**
-   * Export as directory with skill.yaml
+   * Export as directory with SKILL.md
    */
   private async exportAsDir(
     skill: Skill,
@@ -94,7 +106,7 @@ export class Exporter {
     options: ExportOptions
   ): Promise<ExportResult> {
     const dirPath = join(outputBase, skill.name);
-    const yamlPath = join(dirPath, 'skill.yaml');
+    const mdPath = join(dirPath, 'SKILL.md');
 
     // Check if directory exists
     const exists = await this.pathExists(dirPath);
@@ -111,9 +123,9 @@ export class Exporter {
     // Create directory
     await mkdir(dirPath, { recursive: true });
 
-    // Write skill.yaml
-    const yamlContent = stringify(skill);
-    await writeFile(yamlPath, yamlContent, 'utf-8');
+    // Write SKILL.md
+    const mdContent = this.skillToMarkdown(skill);
+    await writeFile(mdPath, mdContent, 'utf-8');
 
     return {
       success: true,
@@ -148,8 +160,8 @@ export class Exporter {
 
     // Create a simple zip file using store method (no compression)
     // This is a minimal implementation without archiver dependency
-    const yamlContent = stringify(skill);
-    const zipBuffer = this.createSimpleZip(skill.name, yamlContent);
+    const mdContent = this.skillToMarkdown(skill);
+    const zipBuffer = this.createSimpleZip(skill.name, mdContent);
 
     await writeFile(zipPath, zipBuffer);
 
@@ -187,11 +199,11 @@ export class Exporter {
     }
 
     // Create tarball
-    const yamlContent = stringify(skill);
+    const mdContent = this.skillToMarkdown(skill);
     const pack = tarPack();
 
-    // Add skill.yaml to archive
-    pack.entry({ name: `${skill.name}/skill.yaml` }, yamlContent);
+    // Add SKILL.md to archive
+    pack.entry({ name: `${skill.name}/SKILL.md` }, mdContent);
     pack.finalize();
 
     // Gzip and write to file
@@ -234,10 +246,10 @@ export class Exporter {
     }
 
     // Create tarball (same as tarball format)
-    const yamlContent = stringify(skill);
+    const mdContent = this.skillToMarkdown(skill);
     const pack = tarPack();
 
-    pack.entry({ name: `${skill.name}/skill.yaml` }, yamlContent);
+    pack.entry({ name: `${skill.name}/SKILL.md` }, mdContent);
     pack.finalize();
 
     const gzip = createGzip();
@@ -261,7 +273,7 @@ export class Exporter {
    * Minimal implementation without external dependencies
    */
   private createSimpleZip(skillName: string, content: string): Buffer {
-    const fileName = `${skillName}/skill.yaml`;
+    const fileName = `${skillName}/SKILL.md`;
     const fileNameBuffer = Buffer.from(fileName, 'utf-8');
     const contentBuffer = Buffer.from(content, 'utf-8');
 

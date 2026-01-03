@@ -8,8 +8,8 @@
 import type { ToolHandler, ToolResult, InstallSkillInput } from '../types.js';
 import { getStore, successResult, errorResult, validateString, validateScope } from './utils.js';
 import { InvalidSourceError } from '../types.js';
+import matter from 'gray-matter';
 import {
-  parse as parseSkillYaml,
   detectSkillMd,
   fetchSkillMdContent,
   createInstaller,
@@ -78,25 +78,7 @@ async function fetchSkillFromGitHub(repo: string): Promise<Skill | null> {
     }
   }
 
-  // Fall back to skill.yaml
-  const skillYamlPaths = ['skill.yaml', 'skill.yml', '.claude/skill.yaml'];
-  const branches = ['main', 'master', 'HEAD'];
-
-  for (const branch of branches) {
-    for (const path of skillYamlPaths) {
-      const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
-      try {
-        const yamlContent = await fetchSkillFromUrl(url);
-        const result = parseSkillYaml(yamlContent);
-        if (result.success && result.data) {
-          return result.data;
-        }
-      } catch {
-        // Try next
-      }
-    }
-  }
-
+  // No SKILL.md found in standard locations
   return null;
 }
 
@@ -115,11 +97,20 @@ async function fetchSkillFromGist(gistId: string): Promise<Skill | null> {
     files: Record<string, { content: string; filename: string }>;
   };
 
+  // Look for SKILL.md in Gist files
   for (const [filename, file] of Object.entries(gist.files)) {
-    if (filename === 'skill.yaml' || filename === 'skill.yml') {
-      const result = parseSkillYaml(file.content);
-      if (result.success && result.data) {
-        return result.data;
+    if (filename === 'SKILL.md' || filename === 'skill.md') {
+      try {
+        const { data, content: body } = matter(file.content);
+        return {
+          schema: '1.0',
+          name: (data.name as string) || '',
+          version: (data.version as string) || '1.0.0',
+          description: (data.description as string) || '',
+          instructions: body.trim(),
+        };
+      } catch {
+        // Invalid frontmatter
       }
     }
   }
@@ -140,7 +131,8 @@ async function fetchSkillFromLocal(path: string): Promise<Skill | null> {
     const stat = await fs.stat(path);
 
     if (stat.isDirectory()) {
-      const candidates = ['SKILL.md', 'skill.yaml', 'skill.yml'];
+      // Only SKILL.md format is supported
+      const candidates = ['SKILL.md', 'skill.md'];
       for (const candidate of candidates) {
         const fullPath = nodePath.join(path, candidate);
         try {
@@ -153,35 +145,24 @@ async function fetchSkillFromLocal(path: string): Promise<Skill | null> {
       }
     }
 
+    // Only process SKILL.md files
+    if (!skillPath.toLowerCase().endsWith('.md')) {
+      return null;
+    }
+
     const content = await fs.readFile(skillPath, 'utf-8');
+    const { data, content: body } = matter(content);
 
-    // Check if SKILL.md format
-    if (skillPath.endsWith('.md')) {
-      const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-      if (match) {
-        const { parse: parseYaml } = await import('yaml');
-        const frontmatter = parseYaml(match[1]);
-        return {
-          schema: '1.0',
-          name: frontmatter.name,
-          version: frontmatter.version || '1.0.0',
-          description: frontmatter.description || '',
-          instructions: match[2],
-          dependencies: frontmatter.dependencies,
-        };
-      }
-    }
-
-    // Parse as YAML
-    const result = parseSkillYaml(content);
-    if (result.success && result.data) {
-      return result.data;
-    }
+    return {
+      schema: '1.0',
+      name: (data.name as string) || '',
+      version: (data.version as string) || '1.0.0',
+      description: (data.description as string) || '',
+      instructions: body.trim(),
+    };
   } catch {
     return null;
   }
-
-  return null;
 }
 
 /**
@@ -215,8 +196,19 @@ async function fetchSkillBySource(source: string): Promise<Skill | null> {
         return fetchSkillFromGist(value);
       case 'url': {
         const content = await fetchSkillFromUrl(value);
-        const result = parseSkillYaml(content);
-        return result.success && result.data ? result.data : null;
+        // Parse as SKILL.md format with gray-matter
+        try {
+          const { data, content: body } = matter(content);
+          return {
+            schema: '1.0',
+            name: (data.name as string) || '',
+            version: (data.version as string) || '1.0.0',
+            description: (data.description as string) || '',
+            instructions: body.trim(),
+          };
+        } catch {
+          return null;
+        }
       }
       case 'local':
         return fetchSkillFromLocal(value);
@@ -236,7 +228,7 @@ Supports SKILL.md format (industry standard for Claude Code and OpenAI Codex).
 Supported source formats:
 • GitHub: github:user/repo or user/repo (e.g., "anthropics/claude-code-skills")
 • Gist: gist:id (e.g., "gist:abc123")
-• URL: https://... (direct link to SKILL.md or skill.yaml)
+• URL: https://... (direct link to SKILL.md)
 • Local: ./path or /absolute/path (local file or directory)
 
 Returns:
