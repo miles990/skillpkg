@@ -30,6 +30,9 @@ export {
   createSearchSkillsHandler,
   createInstallSkillHandler,
   createUninstallSkillHandler,
+  createSyncSkillsHandler,
+  createCreateSkillHandler,
+  createSkillStatusHandler,
   createSkillInfoHandler,
   createRecommendSkillHandler,
 } from './tools/index.js';

@@ -54,6 +54,8 @@ export interface CreateSkillOptions {
   name: string;
   /** Short description */
   description?: string;
+  /** Custom instructions content (markdown) */
+  instructions?: string;
   /** Whether to create a directory for the skill */
   createDir?: boolean;
   /** Target directory (defaults to cwd) */

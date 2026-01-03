@@ -18,7 +18,7 @@ export class SkillCreator {
    * @returns Path to created SKILL.md
    */
   async create(options: CreateSkillOptions): Promise<string> {
-    const { name, description, createDir = true, targetDir = process.cwd() } = options;
+    const { name, description, instructions, createDir = true, targetDir = process.cwd() } = options;
 
     const normalizedName = this.normalizeName(name);
     const skillDir = createDir ? join(targetDir, normalizedName) : targetDir;
@@ -35,7 +35,7 @@ export class SkillCreator {
     }
 
     // Generate template
-    const template = this.generateTemplate(normalizedName, description);
+    const template = this.generateTemplate(normalizedName, description, instructions);
 
     // Write file
     await writeFile(skillMdPath, template, 'utf-8');
@@ -48,16 +48,18 @@ export class SkillCreator {
    *
    * @param name - Skill name (kebab-case)
    * @param description - Short description
+   * @param instructions - Custom instructions content
    * @returns SKILL.md content with frontmatter
    */
-  generateTemplate(name: string, description?: string): string {
+  generateTemplate(name: string, description?: string, instructions?: string): string {
     const metadata: SkillFrontmatter = {
       name: this.normalizeName(name),
       version: '1.0.0',
       description: description || 'A helpful skill',
     };
 
-    const content = `# ${this.toTitleCase(name)}
+    // Use custom instructions or default template
+    const content = instructions || `# ${this.toTitleCase(name)}
 
 Add your skill instructions here...
 
