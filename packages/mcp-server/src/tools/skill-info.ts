@@ -1,18 +1,29 @@
 /**
  * Tool: skill_info
  *
- * Gets detailed information about a skill from the registry.
+ * Gets detailed information about an installed skill.
  */
 
-import type { ToolHandler, ToolResult, SkillInfoInput, SkillInfoOutput, Author } from '../types.js';
-import { getRegistryClient, successResult, errorResult, validateString } from './utils.js';
-import { SkillNotFoundError } from '../types.js';
+import type { ToolHandler, ToolResult } from '../types.js';
+import { successResult, errorResult, validateString } from './utils.js';
+import { createGlobalStore, createLocalStore, getSkillMdPath } from 'skillpkg-core';
+
+export interface SkillInfoInput {
+  name: string;
+}
 
 export function createSkillInfoHandler(): ToolHandler {
   return {
     name: 'skill_info',
-    description:
-      'Get detailed information about a skill from the registry, including versions, readme, and metadata.',
+    description: `Get detailed information about an installed skill.
+
+Shows skill metadata, installation details, and instructions preview.
+Searches both local (.skillpkg) and global (~/.skillpkg) stores.
+
+Parameters:
+- name (required): Name of the installed skill
+
+Returns skill details including version, description, path, and sync status.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -30,67 +41,87 @@ export function createSkillInfoHandler(): ToolHandler {
       try {
         const skillName = validateString(input.name, 'name');
 
-        const client = getRegistryClient();
+        // Try local first, then global
+        const stores = [createLocalStore(), createGlobalStore()];
 
-        let skillInfo;
-        try {
-          skillInfo = await client.getSkillInfo(skillName);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : '';
-          if (message.includes('404') || message.includes('not found')) {
-            throw new SkillNotFoundError(skillName);
+        for (const store of stores) {
+          const skill = await store.getSkill(skillName);
+          if (!skill) continue;
+
+          const entry = await store.getSkillEntry(skillName);
+          const storeDir = store.getStoreDir();
+          const skillPath = getSkillMdPath(storeDir, skillName);
+          const scope = storeDir.includes('.skillpkg') && !storeDir.includes('/.skillpkg')
+            ? 'global'
+            : 'local';
+
+          // Format output
+          const lines: string[] = [
+            `# ${skill.name} (${scope})`,
+            '',
+            `**Version:** ${skill.version}`,
+          ];
+
+          if (skill.description) {
+            lines.push(`**Description:** ${skill.description}`);
           }
-          throw error;
+
+          if (skill.author) {
+            const author = typeof skill.author === 'string'
+              ? skill.author
+              : skill.author.name;
+            lines.push(`**Author:** ${author}`);
+          }
+
+          lines.push('');
+          lines.push(`**Path:** ${skillPath}`);
+
+          if (entry?.source) {
+            lines.push(`**Source:** ${entry.source}`);
+          }
+
+          if (entry?.sourceUrl) {
+            lines.push(`**Source URL:** ${entry.sourceUrl}`);
+          }
+
+          if (entry?.installedAt) {
+            const date = new Date(entry.installedAt).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            });
+            lines.push(`**Installed:** ${date}`);
+          }
+
+          if (entry?.syncedPlatforms && entry.syncedPlatforms.length > 0) {
+            lines.push(`**Synced to:** ${entry.syncedPlatforms.join(', ')}`);
+          }
+
+          // Instructions preview
+          if (skill.instructions) {
+            lines.push('');
+            lines.push('---');
+            lines.push('');
+            lines.push('**Instructions preview:**');
+            const preview = skill.instructions.substring(0, 300);
+            lines.push(preview + (skill.instructions.length > 300 ? '...' : ''));
+          }
+
+          lines.push('');
+          lines.push('---');
+          lines.push('');
+          lines.push(`To uninstall: \`uninstall_skill id: "${skillName}"\``);
+          lines.push(`To sync: \`sync_skills\``);
+
+          return successResult(lines.join('\n'));
         }
 
-        const author: Author =
-          typeof skillInfo.author === 'string'
-            ? { name: skillInfo.author }
-            : skillInfo.author || { name: 'Unknown' };
-
-        const output: SkillInfoOutput = {
-          name: skillInfo.name,
-          description: skillInfo.description,
-          version: skillInfo.version,
-          author,
-          repository: skillInfo.repository,
-          license: skillInfo.license,
-          tags: skillInfo.keywords,
-        };
-
-        // Format detailed output
-        let text = `# ${output.name}\n\n`;
-        text += `**Version:** ${output.version}\n`;
-        text += `**Author:** ${output.author.name}`;
-        if (output.author.email) text += ` <${output.author.email}>`;
-        if (output.author.url) text += ` (${output.author.url})`;
-        text += '\n';
-
-        if (output.license) {
-          text += `**License:** ${output.license}\n`;
-        }
-
-        if (output.repository) {
-          text += `**Repository:** ${output.repository}\n`;
-        }
-
-        if (output.tags && output.tags.length > 0) {
-          text += `**Tags:** ${output.tags.join(', ')}\n`;
-        }
-
-        text += '\n---\n\n';
-        text += `${output.description}\n`;
-
-        text += `\n\n---\n\nTo install: install_skill source: "${skillName}"`;
-
-        return successResult(text);
+        // Not found
+        return errorResult(
+          `Skill "${skillName}" is not installed.`,
+          'Use search_skills to find available skills, or install_skill to install one.'
+        );
       } catch (error) {
-        if (error instanceof SkillNotFoundError) {
-          return errorResult(
-            `Skill "${input.name}" not found in registry.`,
-            'Use search_registry to find available skills.'
-          );
-        }
         const message = error instanceof Error ? error.message : String(error);
         return errorResult(`Failed to get skill info: ${message}`);
       }

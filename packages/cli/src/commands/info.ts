@@ -1,16 +1,12 @@
 /**
- * info command - Get detailed information about a skill
+ * info command - Get detailed information about an installed skill
  */
-import {
-  createRegistryClient,
-  RegistryError,
-  DEFAULT_REGISTRY_URL,
-} from 'skillpkg-core';
+import { createGlobalStore, createLocalStore, getSkillMdPath } from 'skillpkg-core';
 import { logger, colors } from '../ui/index.js';
 
 interface InfoCommandOptions {
   json?: boolean;
-  registry?: string;
+  global?: boolean;
 }
 
 /**
@@ -26,106 +22,96 @@ export async function infoCommand(
     process.exit(1);
   }
 
-  const client = createRegistryClient({
-    registryUrl: options.registry || DEFAULT_REGISTRY_URL,
-  });
+  // Try local first, then global
+  const stores = options.global
+    ? [createGlobalStore()]
+    : [createLocalStore(), createGlobalStore()];
 
-  try {
-    const info = await client.getSkillInfo(skillName);
+  for (const store of stores) {
+    const skill = await store.getSkill(skillName);
+    if (!skill) continue;
+
+    const entry = await store.getSkillEntry(skillName);
+    const storeDir = store.getStoreDir();
+    const skillPath = getSkillMdPath(storeDir, skillName);
+    const scope = storeDir.includes('.skillpkg') && !storeDir.includes('/.skillpkg')
+      ? 'global'
+      : 'local';
 
     // JSON output mode
     if (options.json) {
-      console.log(JSON.stringify(info, null, 2));
+      console.log(JSON.stringify({
+        name: skill.name,
+        version: skill.version,
+        description: skill.description,
+        author: skill.author,
+        scope,
+        path: skillPath,
+        installedAt: entry?.installedAt,
+        source: entry?.source,
+        sourceUrl: entry?.sourceUrl,
+        syncedPlatforms: entry?.syncedPlatforms || [],
+      }, null, 2));
       return;
     }
 
-    logger.header(`${info.name}`);
+    // Display info
+    logger.header(`${skill.name} (${scope})`);
 
-    // Basic info
-    logger.log(`${colors.dim('Version:')}     ${info.version}`);
-    if (info.description) {
-      logger.log(`${colors.dim('Description:')} ${info.description}`);
+    logger.log(`${colors.dim('Version:')}     ${skill.version}`);
+    if (skill.description) {
+      logger.log(`${colors.dim('Description:')} ${skill.description}`);
     }
-    if (info.author) {
-      const author = info.author.email
-        ? `${info.author.name} <${info.author.email}>`
-        : info.author.name;
+    if (skill.author) {
+      const author = typeof skill.author === 'string'
+        ? skill.author
+        : skill.author.name;
       logger.log(`${colors.dim('Author:')}      ${author}`);
     }
-    if (info.license) {
-      logger.log(`${colors.dim('License:')}     ${info.license}`);
+
+    logger.blank();
+
+    logger.log(`${colors.dim('Path:')}        ${skillPath}`);
+    if (entry?.source) {
+      logger.log(`${colors.dim('Source:')}      ${entry.source}`);
     }
-    if (info.homepage) {
-      logger.log(`${colors.dim('Homepage:')}    ${colors.cyan(info.homepage)}`);
+    if (entry?.sourceUrl) {
+      logger.log(`${colors.dim('Source URL:')}  ${colors.cyan(entry.sourceUrl)}`);
     }
-    if (info.repository) {
-      logger.log(`${colors.dim('Repository:')}  ${colors.cyan(info.repository)}`);
+    if (entry?.installedAt) {
+      logger.log(`${colors.dim('Installed:')}   ${formatDate(entry.installedAt)}`);
+    }
+
+    if (entry?.syncedPlatforms && entry.syncedPlatforms.length > 0) {
+      logger.blank();
+      logger.log(`${colors.dim('Synced to:')}   ${entry.syncedPlatforms.join(', ')}`);
     }
 
     logger.blank();
 
-    // Downloads
-    logger.log(colors.dim('Downloads:'));
-    logger.log(`  Total:   ${formatNumber(info.downloads.total)}`);
-    logger.log(`  Weekly:  ${formatNumber(info.downloads.weekly)}`);
-    logger.log(`  Monthly: ${formatNumber(info.downloads.monthly)}`);
-
-    logger.blank();
-
-    // Keywords
-    if (info.keywords && info.keywords.length > 0) {
-      logger.log(`${colors.dim('Keywords:')} ${info.keywords.join(', ')}`);
+    // Show instructions preview
+    if (skill.instructions) {
+      const preview = skill.instructions.substring(0, 200);
+      logger.log(colors.dim('Instructions preview:'));
+      logger.log(colors.dim('─'.repeat(40)));
+      logger.log(preview + (skill.instructions.length > 200 ? '...' : ''));
+      logger.log(colors.dim('─'.repeat(40)));
       logger.blank();
     }
 
-    // Versions
-    if (info.versions && info.versions.length > 0) {
-      logger.log(colors.dim('Versions:'));
-      const displayVersions = info.versions.slice(0, 5);
-      for (const ver of displayVersions) {
-        const date = new Date(ver.publishedAt).toLocaleDateString();
-        const deprecated = ver.deprecated ? colors.yellow(' (deprecated)') : '';
-        logger.log(`  ${ver.version} - ${colors.dim(date)}${deprecated}`);
-      }
-      if (info.versions.length > 5) {
-        logger.log(colors.dim(`  ... and ${info.versions.length - 5} more`));
-      }
-      logger.blank();
-    }
-
-    // Dates
-    logger.log(`${colors.dim('Created:')}  ${formatDate(info.createdAt)}`);
-    logger.log(`${colors.dim('Updated:')}  ${formatDate(info.updatedAt)}`);
-
+    // Actions
+    logger.log('Actions:');
+    logger.log(`  ${colors.cyan(`skillpkg uninstall ${skill.name}`)}`);
+    logger.log(`  ${colors.cyan(`skillpkg sync`)}`);
     logger.blank();
 
-    // Install command
-    logger.log('Install:');
-    logger.log(`  ${colors.cyan(`skillpkg install ${info.name}`)}`);
-    logger.blank();
-  } catch (error) {
-    if (error instanceof RegistryError) {
-      if (error.code === 'SKILL_NOT_IN_REGISTRY') {
-        logger.error(`Skill '${skillName}' not found in registry`);
-        logger.log(`Try: ${colors.cyan(`skillpkg search ${skillName}`)}`);
-      } else if (error.code === 'NETWORK_ERROR') {
-        logger.error('Unable to connect to registry');
-        logger.log(`Registry URL: ${colors.dim(client.getRegistryUrl())}`);
-      } else {
-        logger.error(`Registry error: ${error.message}`);
-      }
-    } else {
-      logger.error(`Failed to get skill info: ${error instanceof Error ? error.message : error}`);
-    }
-    process.exit(1);
+    return;
   }
-}
 
-/**
- * Format number with thousands separator
- */
-function formatNumber(num: number): string {
-  return num.toLocaleString();
+  // Not found
+  logger.error(`Skill '${skillName}' is not installed`);
+  logger.log(`Try: ${colors.cyan(`skillpkg search ${skillName}`)}`);
+  process.exit(1);
 }
 
 /**

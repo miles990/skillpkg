@@ -24,6 +24,7 @@ export {
   getLocalDir,
   getSkillsDir,
   getSkillDir,
+  getSkillMdPath,
   getSkillYamlPath,
   getRegistryPath,
   getConfigPath,
