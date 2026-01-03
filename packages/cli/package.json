@@ -1,6 +1,6 @@
 {
   "name": "skillpkg-cli",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "CLI for skillpkg - Agent Skills Package Manager. Install once, use everywhere.",
   "type": "module",
   "bin": {

@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/skill-format/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2026-01-03T05:29:26.812Z",
+      "trigger": "initial",
+      "approvalId": "approval_1767418166807_uldj0ton3",
+      "approvalTitle": "SKILL.md 統一格式 - Requirements"
+    }
+  ]
+}

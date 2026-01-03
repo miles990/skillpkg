@@ -1,0 +1,10 @@
+{
+  "$schema": "https://skillpkg.dev/schemas/skillpkg.json",
+  "name": "skillpkg",
+  "skills": {},
+  "mcp": {},
+  "reminders": [],
+  "sync_targets": {
+    "claude-code": true
+  }
+}

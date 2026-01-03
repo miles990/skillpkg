@@ -247,20 +247,20 @@ export class Installer {
         };
       }
 
-      // Check if already installed
-      const existing = await this.storeManager.getSkill(step.name);
+      // Check if already installed (use skill.name from metadata)
+      const existing = await this.storeManager.getSkill(skill.name);
       const action: 'installed' | 'updated' = existing ? 'updated' : 'installed';
 
       // Add/update in store
       if (existing) {
-        await this.storeManager.updateSkill(step.name, skill);
+        await this.storeManager.updateSkill(skill.name, skill);
       } else {
         await this.storeManager.addSkill(skill, { source: 'registry', sourceUrl: source });
       }
 
-      // Record in state
+      // Record in state (use skill.name from metadata for consistency)
       await recordDependencyInstall(projectPath, this.stateManager, {
-        name: step.name,
+        name: skill.name,
         source: step.source,
         isTransitive: step.isTransitive,
         requiredBy: step.requiredBy,
@@ -268,7 +268,7 @@ export class Installer {
       }, skill.version);
 
       return {
-        name: step.name,
+        name: skill.name,
         version: skill.version,
         success: true,
         action,
