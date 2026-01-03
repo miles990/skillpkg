@@ -15,9 +15,9 @@ const projectEnv = join(process.cwd(), '.env');
 const globalEnv = join(homedir(), '.skillpkg', '.env');
 
 if (existsSync(projectEnv)) {
-  config({ path: projectEnv });
+  config({ path: projectEnv, quiet: true });
 } else if (existsSync(globalEnv)) {
-  config({ path: globalEnv });
+  config({ path: globalEnv, quiet: true });
 }
 
 // Get version from package.json

@@ -139,8 +139,12 @@ export class SkillsmpProvider implements DiscoveryProvider {
   /**
    * Map API response to DiscoveredSkill format
    */
-  private mapResults(data: SkillsmpSearchResponse): DiscoveredSkill[] {
-    return (data.skills || []).map((skill) => ({
+  private mapResults(response: SkillsmpSearchResponse): DiscoveredSkill[] {
+    if (!response.success || !response.data?.skills) {
+      return [];
+    }
+
+    return response.data.skills.map((skill) => ({
       name: skill.name,
       description: skill.description || '',
       source: this.resolveSource(skill),
@@ -148,7 +152,7 @@ export class SkillsmpProvider implements DiscoveryProvider {
       stars: skill.stars,
       author: skill.author,
       keywords: skill.keywords,
-      lastUpdated: skill.updated_at,
+      lastUpdated: skill.updatedAt ? new Date(skill.updatedAt * 1000).toISOString() : undefined,
     }));
   }
 
@@ -157,8 +161,8 @@ export class SkillsmpProvider implements DiscoveryProvider {
    */
   private resolveSource(skill: SkillsmpSkill): string {
     // Prefer GitHub URL if available
-    if (skill.github_url) {
-      const match = skill.github_url.match(
+    if (skill.githubUrl) {
+      const match = skill.githubUrl.match(
         /github\.com\/([^\/]+\/[^\/]+)(?:\/tree\/[^\/]+\/(.+))?/
       );
       if (match) {
@@ -183,10 +187,19 @@ export class SkillsmpProvider implements DiscoveryProvider {
  * Skillsmp API response types
  */
 interface SkillsmpSearchResponse {
-  skills?: SkillsmpSkill[];
-  total?: number;
-  page?: number;
-  limit?: number;
+  success: boolean;
+  data?: {
+    skills?: SkillsmpSkill[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  };
+  error?: string;
 }
 
 interface SkillsmpSkill {
@@ -195,9 +208,10 @@ interface SkillsmpSkill {
   description?: string;
   author?: string;
   stars?: number;
-  github_url?: string;
+  githubUrl?: string;
+  skillUrl?: string;
   keywords?: string[];
-  updated_at?: string;
+  updatedAt?: number;
 }
 
 /**
