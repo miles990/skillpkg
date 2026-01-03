@@ -14,6 +14,8 @@ export type SourceType = 'github' | 'gist' | 'url' | 'local' | 'pack';
 export interface ParsedSource {
   type: SourceType;
   value: string;
+  /** Subpath within repo (for github:user/repo#path format) */
+  subpath?: string;
   /** Original source string */
   original: string;
 }

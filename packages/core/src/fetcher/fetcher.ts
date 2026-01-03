@@ -54,7 +54,7 @@ async function fetchByType(
 ): Promise<Skill | null> {
   switch (parsed.type) {
     case 'github':
-      return fetchFromGitHub(parsed.value, options);
+      return fetchFromGitHub(parsed.value, parsed.subpath, options);
     case 'gist':
       return fetchFromGist(parsed.value, options);
     case 'url':
@@ -70,21 +70,34 @@ async function fetchByType(
 
 /**
  * Fetch skill from GitHub repository
+ *
+ * @param repo - GitHub repo in user/repo format
+ * @param subpath - Optional subpath within repo (e.g., 'docs/skills/my-skill')
+ * @param options - Fetcher options
  */
 async function fetchFromGitHub(
   repo: string,
+  subpath: string | undefined,
   options: FetcherOptions
 ): Promise<Skill | null> {
   const token = options.githubToken || process.env.GITHUB_TOKEN;
 
-  // Detect SKILL.md location
-  const detection = await detectSkillMd(repo, token);
-  if (!detection.hasSkill || !detection.skillFile) {
-    return null;
+  let skillFile: string;
+
+  if (subpath) {
+    // Direct subpath provided: use {subpath}/SKILL.md
+    skillFile = `${subpath}/SKILL.md`;
+  } else {
+    // No subpath: detect SKILL.md location in repo root
+    const detection = await detectSkillMd(repo, token);
+    if (!detection.hasSkill || !detection.skillFile) {
+      return null;
+    }
+    skillFile = detection.skillFile;
   }
 
   // Fetch raw content
-  const rawUrl = `https://raw.githubusercontent.com/${repo}/HEAD/${detection.skillFile}`;
+  const rawUrl = `https://raw.githubusercontent.com/${repo}/HEAD/${skillFile}`;
   const headers: Record<string, string> = {
     'User-Agent': 'skillpkg',
   };
