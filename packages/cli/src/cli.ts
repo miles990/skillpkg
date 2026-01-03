@@ -11,8 +11,9 @@ import { importCommand } from './commands/import.js';
 import { exportCommand } from './commands/export.js';
 import { searchCommand } from './commands/search.js';
 import { infoCommand } from './commands/info.js';
-import { loginCommand, logoutCommand, whoamiCommand } from './commands/login.js';
-import { publishCommand } from './commands/publish.js';
+// Registry commands - hidden until public registry is available
+// import { loginCommand, logoutCommand, whoamiCommand } from './commands/login.js';
+// import { publishCommand } from './commands/publish.js';
 import { depsCommand, whyCommand, treeCommand } from './commands/deps.js';
 import { statusCommand } from './commands/status.js';
 // import { migrateCommand } from './commands/migrate.js'; // Hidden until needed
@@ -105,37 +106,38 @@ export function registerCommands(program: Command): void {
     .option('--registry <url>', 'Use custom registry')
     .action(infoCommand);
 
+  // Registry commands - hidden until public registry is available
   // login - Authenticate with a registry
-  program
-    .command('login')
-    .description('Authenticate with a registry')
-    .option('--registry <url>', 'Registry URL')
-    .option('-t, --token <token>', 'Auth token (for non-interactive use)')
-    .action(loginCommand);
+  // program
+  //   .command('login')
+  //   .description('Authenticate with a registry')
+  //   .option('--registry <url>', 'Registry URL')
+  //   .option('-t, --token <token>', 'Auth token (for non-interactive use)')
+  //   .action(loginCommand);
 
   // logout - Log out from a registry
-  program
-    .command('logout')
-    .description('Log out from a registry')
-    .option('--registry <url>', 'Registry URL')
-    .action(logoutCommand);
+  // program
+  //   .command('logout')
+  //   .description('Log out from a registry')
+  //   .option('--registry <url>', 'Registry URL')
+  //   .action(logoutCommand);
 
   // whoami - Show current logged in user
-  program
-    .command('whoami')
-    .description('Show current logged in user')
-    .option('--registry <url>', 'Registry URL')
-    .action(whoamiCommand);
+  // program
+  //   .command('whoami')
+  //   .description('Show current logged in user')
+  //   .option('--registry <url>', 'Registry URL')
+  //   .action(whoamiCommand);
 
   // publish - Publish a skill to the registry
-  program
-    .command('publish')
-    .description('Publish a skill to the registry')
-    .option('--tag <tag>', 'Publish with tag (default: latest)')
-    .option('--access <access>', 'Access level (public, restricted)')
-    .option('--registry <url>', 'Registry URL')
-    .option('--dry-run', 'Show what would be published without publishing')
-    .action(publishCommand);
+  // program
+  //   .command('publish')
+  //   .description('Publish a skill to the registry')
+  //   .option('--tag <tag>', 'Publish with tag (default: latest)')
+  //   .option('--access <access>', 'Access level (public, restricted)')
+  //   .option('--registry <url>', 'Registry URL')
+  //   .option('--dry-run', 'Show what would be published without publishing')
+  //   .action(publishCommand);
 
   // deps - Show dependencies of a skill
   program
