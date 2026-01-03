@@ -1,14 +1,23 @@
 /**
- * search command - Search for skills on GitHub
+ * search command - Multi-source skill discovery
  *
- * Uses GitHub API to find repositories with SKILL.md files.
- * SKILL.md is the industry standard for Claude Code and OpenAI Codex.
+ * Searches across multiple sources with deduplication:
+ * - local: Installed skills
+ * - skillsmp: Primary registry (40K+ skills, requires API key)
+ * - awesome: Fallback curated repos (no key required)
+ * - github: Supplementary search
  */
-import { searchGitHubSkills } from 'skillpkg-core';
+import {
+  createDiscoveryManager,
+  createLocalStore,
+  createGlobalStore,
+  type DiscoverySource,
+} from 'skillpkg-core';
 import { logger, colors } from '../ui/index.js';
 
 interface SearchCommandOptions {
   limit?: string;
+  source?: string;
   json?: boolean;
 }
 
@@ -25,73 +34,135 @@ export async function searchCommand(
     process.exit(1);
   }
 
-  logger.header('Search Skills on GitHub');
+  logger.header('Search Skills');
   logger.log(`Searching for: ${colors.cyan(query)}`);
   logger.blank();
 
   try {
     const limit = options.limit ? parseInt(options.limit, 10) : 20;
 
-    const results = await searchGitHubSkills(query, { limit });
+    // Determine sources
+    let sources: DiscoverySource[] | undefined;
+    if (options.source) {
+      const validSources: DiscoverySource[] = ['local', 'skillsmp', 'awesome', 'github'];
+      const requestedSource = options.source.toLowerCase() as DiscoverySource;
+      if (validSources.includes(requestedSource)) {
+        sources = [requestedSource];
+      } else if (options.source === 'all') {
+        sources = undefined; // Use default
+      } else {
+        logger.error(`Invalid source: ${options.source}`);
+        logger.log(`Valid sources: ${validSources.join(', ')}, all`);
+        process.exit(1);
+      }
+    }
+
+    // Get store manager for local provider
+    const localStore = createLocalStore();
+    const globalStore = createGlobalStore();
+    let storeManager;
+    if (await localStore.isInitialized()) {
+      storeManager = localStore;
+    } else if (await globalStore.isInitialized()) {
+      storeManager = globalStore;
+    }
+
+    // Create discovery manager
+    const manager = createDiscoveryManager({
+      skillsmpApiKey: process.env.SKILLSMP_API_KEY,
+      githubToken: process.env.GITHUB_TOKEN,
+      storeManager,
+    });
+
+    // Show which sources will be queried
+    const defaultSources = manager.getDefaultSources();
+    const sourcesToQuery = sources || defaultSources;
+    logger.log(colors.dim(`Sources: ${sourcesToQuery.join(', ')}`));
+    logger.blank();
+
+    // Search
+    const result = await manager.search({
+      query,
+      limit,
+      sources,
+    });
 
     // JSON output mode
     if (options.json) {
-      console.log(JSON.stringify(results, null, 2));
+      console.log(JSON.stringify(result, null, 2));
       return;
     }
 
-    if (results.length === 0) {
+    if (result.skills.length === 0) {
       logger.warn('No skills found matching your query');
-      logger.log(colors.dim('Try different keywords or check GitHub directly.'));
+      if (result.errors) {
+        logger.blank();
+        logger.log(colors.dim('Errors:'));
+        for (const [source, error] of Object.entries(result.errors)) {
+          logger.log(colors.dim(`  ${source}: ${error}`));
+        }
+      }
       return;
     }
 
-    // Count skills with SKILL.md
-    const withSkillMd = results.filter((r) => r.hasSkill).length;
-    logger.log(
-      `Found ${colors.cyan(String(results.length))} repository(s)` +
-        (withSkillMd > 0 ? ` (${colors.green(String(withSkillMd))} with SKILL.md)` : '')
-    );
+    // Summary
+    let summary = `Found ${colors.cyan(String(result.skills.length))} skill(s)`;
+    if (result.duplicatesRemoved > 0) {
+      summary += ` (${colors.yellow(String(result.duplicatesRemoved))} duplicates removed)`;
+    }
+    logger.log(summary);
     logger.blank();
 
     // Display results
-    for (const item of results) {
-      const name = colors.cyan(item.name);
-      const hasSkill = item.hasSkill ? colors.green(' ✓ SKILL.md') : '';
-      const stars = colors.yellow(`⭐${formatNumber(item.stars)}`);
+    for (const skill of result.skills) {
+      const name = colors.cyan(skill.name);
+      const stars = skill.stars ? colors.yellow(` ⭐${formatNumber(skill.stars)}`) : '';
+      const author = skill.author ? colors.dim(` by ${skill.author}`) : '';
 
-      logger.log(`${name}${hasSkill} ${stars}`);
-      logger.log(`  ${colors.dim(item.fullName)}`);
-      if (item.description) {
-        logger.log(`  ${item.description}`);
+      logger.log(`${name}${stars}${author}`);
+
+      if (skill.description) {
+        logger.log(`  ${skill.description}`);
       }
-      if (item.topics && item.topics.length > 0) {
-        logger.log(`  ${colors.dim('Topics:')} ${item.topics.slice(0, 5).join(', ')}`);
+
+      // Source URL (for installation)
+      logger.log(`  ${colors.dim('Source:')} ${skill.source}`);
+
+      // Show "Also in:" if found in multiple sources
+      if (skill.foundIn && skill.foundIn.length > 1) {
+        logger.log(`  ${colors.dim('Also in:')} ${skill.foundIn.slice(1).join(', ')}`);
       }
-      if (item.installSource) {
-        logger.log(`  ${colors.dim('Install:')} skillpkg install ${item.installSource}`);
+
+      // Keywords
+      if (skill.keywords && skill.keywords.length > 0) {
+        logger.log(`  ${colors.dim('Tags:')} ${skill.keywords.slice(0, 5).join(', ')}`);
       }
+
       logger.blank();
     }
 
-    // Tip
-    if (withSkillMd === 0) {
-      logger.log(
-        colors.dim(
-          'Tip: Repositories with SKILL.md can be installed directly. ' +
-            'Others may require manual setup.'
-        )
-      );
+    // Footer
+    logger.log(colors.dim('─'.repeat(50)));
+    logger.log(`Install: ${colors.cyan('skillpkg install <source>')}`);
+
+    // Show errors if any
+    if (result.errors && Object.keys(result.errors).length > 0) {
+      logger.blank();
+      logger.log(colors.dim('Some sources had errors:'));
+      for (const [source, error] of Object.entries(result.errors)) {
+        logger.log(colors.dim(`  ${source}: ${error}`));
+      }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
     if (message.includes('rate limit')) {
-      logger.error('GitHub API rate limit exceeded');
-      logger.log(
-        colors.dim('Set GITHUB_TOKEN environment variable for higher limits:')
-      );
+      logger.error('API rate limit exceeded');
+      logger.log(colors.dim('Set GITHUB_TOKEN for higher GitHub limits:'));
       logger.log(colors.dim('  export GITHUB_TOKEN=your_token_here'));
+      logger.blank();
+      logger.log(colors.dim('Set SKILLSMP_API_KEY for skillsmp.com access:'));
+      logger.log(colors.dim('  export SKILLSMP_API_KEY=your_key_here'));
     } else {
       logger.error(`Search failed: ${message}`);
     }

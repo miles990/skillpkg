@@ -95,15 +95,13 @@ export function registerCommands(program: Command): void {
     .option('--overwrite', 'Overwrite existing files')
     .action(exportCommand);
 
-  // search - Search for skills in the registry
+  // search - Multi-source skill discovery
   program
     .command('search <query>')
-    .description('Search for skills in the registry')
-    .option('-l, --limit <number>', 'Number of results per page', '20')
-    .option('-p, --page <number>', 'Page number', '1')
-    .option('-s, --sort <field>', 'Sort by (relevance, downloads, updated, name)')
+    .description('Search for skills across multiple sources')
+    .option('-l, --limit <number>', 'Maximum results to return', '20')
+    .option('-s, --source <source>', 'Source to search (local, skillsmp, awesome, github, all)')
     .option('--json', 'Output as JSON')
-    .option('--registry <url>', 'Use custom registry')
     .action(searchCommand);
 
   // info - Get detailed information about a skill

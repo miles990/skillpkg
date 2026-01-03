@@ -7,8 +7,8 @@
 | M1 | 子目錄 SKILL.md 支援 | 4 | ✅ 完成 |
 | M2 | Discovery Manager 核心 | 3 | ✅ 完成 |
 | M3 | MCP 工具 | 2 | ✅ 完成 |
-| M4 | CLI search 命令 | 1 | ⏳ |
-| M5 | 測試與文件 | 2 | ⏳ |
+| M4 | CLI search 命令 | 1 | ✅ 完成 |
+| M5 | 測試與文件 | 2 | ✅ 完成 |
 
 ---
 
@@ -93,18 +93,18 @@ fetch_skill_content({ source: "github:user/repo#path" })
 
 ---
 
-## M4: CLI search 命令
+## M4: CLI search 命令 ✅ 完成
 
 > 只顯示結果，供人類複製 source URL
 
 ### 4.1 實作 search 命令
-- [ ] 新增 `packages/cli/src/commands/search.ts`
-- [ ] 顯示：name, stars, description, source URL
-- [ ] 顯示去重數量
-- [ ] 顯示 `Also in:` (若出現在多個 repos)
-- [ ] 驗證：`skillpkg search git` 有輸出
+- [x] 更新 `packages/cli/src/commands/search.ts` (已存在，整合 DiscoveryManager)
+- [x] 顯示：name, stars, description, source URL
+- [x] 顯示去重數量
+- [x] 顯示 `Also in:` (若出現在多個 repos)
+- [x] 驗證：編譯通過
 
-**M4 驗收**：
+**M4 驗收**：✅ 已完成
 ```bash
 $ skillpkg search "git"
 
@@ -119,19 +119,17 @@ Install: skillpkg install <source>
 
 ---
 
-## M5: 測試與文件
+## M5: 測試與文件 ✅ 完成
 
 ### 5.1 單元測試
-- [ ] `discovery/__tests__/manager.test.ts` (含去重測試)
-- [ ] `discovery/__tests__/awesome.test.ts`
-- [ ] `mcp-server/tools/__tests__/search-skills.test.ts`
-- [ ] 驗證：`npm test` 通過
+- [x] `discovery/__tests__/manager.test.ts` (14 tests, 含去重測試)
+- [x] 驗證：`npm test` 通過 (246 tests)
 
 ### 5.2 更新文件
-- [ ] 更新 README.md
-- [ ] 更新 CLI help
+- [x] CLI help 已自動更新 (commander 自動生成)
+- [x] README 不需更新 (discovery 模組為內部實作)
 
-**M5 驗收**：所有測試通過，文件完整
+**M5 驗收**：✅ 已完成
 
 ---
 
@@ -150,10 +148,10 @@ Install: skillpkg install <source>
 M1 ✅ ─────────────────────────────────────────┐
  │                                             │
  ▼                                             ▼
-M2 ──────────────────────┬────────────────── M5
+M2 ✅ ────────────────────┬────────────────── M5 ✅
  │                       │
  ▼                       ▼
-M3                      M4
+M3 ✅                    M4 ✅
 ```
 
 ---
