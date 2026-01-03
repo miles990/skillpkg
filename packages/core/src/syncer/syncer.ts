@@ -16,7 +16,7 @@ import type {
   McpJsonConfig,
 } from './types.js';
 import { getTargetConfig } from './types.js';
-import { parse } from '../parser/index.js';
+import matter from 'gray-matter';
 
 /**
  * Syncer class - syncs skills to AI tool directories
@@ -443,69 +443,22 @@ export function createSyncer(stateManager?: StateManager): Syncer {
 /**
  * Load skill content from a SKILL.md file
  *
- * Supports two formats:
- * 1. YAML files (skill.yaml)
- * 2. Markdown with YAML frontmatter (SKILL.md)
+ * Only supports SKILL.md format (Markdown with YAML frontmatter).
+ * skill.yaml format is no longer supported.
  */
 export async function loadSkillContent(filePath: string): Promise<SkillContent> {
   const rawContent = await readFile(filePath, 'utf-8');
 
-  // Check if it's a YAML file
-  if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
-    const result = parse(rawContent, { validate: false });
-    if (result.success && result.data) {
-      return {
-        name: result.data.name || 'unknown',
-        version: result.data.version || '1.0.0',
-        rawContent,
-        bodyContent: result.data.instructions || rawContent,
-        frontmatter: result.data as unknown as Record<string, unknown>,
-      };
-    }
-  }
-
-  // Parse markdown with YAML frontmatter
-  const { frontmatter, body } = parseMarkdownFrontmatter(rawContent);
+  // Parse SKILL.md with gray-matter
+  const { data, content } = matter(rawContent);
 
   return {
-    name: (frontmatter.name as string) || 'unknown',
-    version: (frontmatter.version as string) || '1.0.0',
+    name: (data.name as string) || 'unknown',
+    version: (data.version as string) || '1.0.0',
     rawContent,
-    bodyContent: body || rawContent,
-    frontmatter,
+    bodyContent: content.trim() || rawContent,
+    frontmatter: data as Record<string, unknown>,
   };
-}
-
-/**
- * Parse YAML frontmatter from markdown content
- */
-function parseMarkdownFrontmatter(content: string): {
-  frontmatter: Record<string, unknown>;
-  body: string;
-} {
-  const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
-  const match = content.match(frontmatterRegex);
-
-  if (!match) {
-    // No frontmatter, return empty frontmatter and full content as body
-    return { frontmatter: {}, body: content };
-  }
-
-  const [, yamlContent, body] = match;
-
-  try {
-    const result = parse(yamlContent, { validate: false });
-    if (result.success && result.data) {
-      return {
-        frontmatter: result.data as unknown as Record<string, unknown>,
-        body: body.trim(),
-      };
-    }
-  } catch {
-    // Parse error, return empty frontmatter
-  }
-
-  return { frontmatter: {}, body: content };
 }
 
 /**

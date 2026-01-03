@@ -44,3 +44,6 @@ export * from './syncer/index.js';
 
 // Installer module - Dependency-aware installation
 export * from './installer/index.js';
+
+// Skill module - Read and create SKILL.md files
+export * from './skill/index.js';

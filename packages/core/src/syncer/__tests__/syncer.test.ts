@@ -349,7 +349,8 @@ Instructions here.
     expect(skill.bodyContent).not.toContain('---');
   });
 
-  it('should load skill from skill.yaml', async () => {
+  it('should return defaults for non-SKILL.md files (skill.yaml no longer supported)', async () => {
+    // Note: skill.yaml format is deprecated - only SKILL.md is supported
     const skillPath = join(TEST_DIR, 'skill.yaml');
     const content = `name: yaml-skill
 version: 1.5.0
@@ -360,8 +361,9 @@ instructions: |
 
     const skill = await loadSkillContent(skillPath);
 
-    expect(skill.name).toBe('yaml-skill');
-    expect(skill.version).toBe('1.5.0');
+    // Pure YAML without Markdown frontmatter returns defaults
+    expect(skill.name).toBe('unknown');
+    expect(skill.version).toBe('1.0.0');
   });
 
   it('should handle markdown without frontmatter', async () => {

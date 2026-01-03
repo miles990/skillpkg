@@ -16,6 +16,7 @@ import { infoCommand } from './commands/info.js';
 // import { publishCommand } from './commands/publish.js';
 import { depsCommand, whyCommand, treeCommand } from './commands/deps.js';
 import { statusCommand } from './commands/status.js';
+import { newCommand } from './commands/new.js';
 // import { migrateCommand } from './commands/migrate.js'; // Hidden until needed
 
 /**
@@ -29,6 +30,13 @@ export function registerCommands(program: Command): void {
     .option('-y, --yes', 'Use default values without prompts')
     .option('-n, --name <name>', 'Project name')
     .action(initCommand);
+
+  // new - Create a new skill
+  program
+    .command('new [name]')
+    .description('Create a new skill (SKILL.md)')
+    .option('-i, --interactive', 'Interactive mode')
+    .action(newCommand);
 
   // install - Install a skill
   program
