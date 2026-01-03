@@ -1,0 +1,9 @@
+{
+  "name": "complex-test",
+  "version": "1.0.0",
+  "features": {
+    "nested_dirs": true,
+    "binary_files": true,
+    "templates": true
+  }
+}

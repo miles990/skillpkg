@@ -2,7 +2,7 @@
  * Base adapter abstract class
  */
 import { existsSync } from 'fs';
-import { mkdir, writeFile, unlink, readFile } from 'fs/promises';
+import { mkdir, writeFile, readFile, rm, stat } from 'fs/promises';
 import { dirname } from 'path';
 import type { Skill } from '../types.js';
 import type { PlatformAdapter } from './types.js';
@@ -63,8 +63,19 @@ export abstract class BaseAdapter implements PlatformAdapter {
    */
   async remove(skillName: string, projectPath: string): Promise<void> {
     const outputPath = this.getOutputPath(skillName, projectPath);
-    if (existsSync(outputPath)) {
-      await unlink(outputPath);
+    // Get the skill directory (parent of SKILL.md)
+    const skillDir = dirname(outputPath);
+
+    if (!existsSync(skillDir)) return;
+
+    try {
+      const stats = await stat(skillDir);
+      if (stats.isDirectory()) {
+        // Remove entire skill directory (including SKILL.md and any additional files)
+        await rm(skillDir, { recursive: true });
+      }
+    } catch {
+      // Ignore errors during removal
     }
   }
 

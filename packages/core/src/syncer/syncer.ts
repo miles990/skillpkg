@@ -199,9 +199,23 @@ export class Syncer {
       const content = this.transformForTarget(skill, targetConfig);
 
       // Check if SKILL.md needs updating
-      const action = await this.getFileAction(skillFile, content, options);
+      let action = await this.getFileAction(skillFile, content, options);
 
-      if (action === 'unchanged') {
+      // Check if additional files need syncing (even if SKILL.md is unchanged)
+      let needsDirSync = false;
+      if (action === 'unchanged' && skill.sourcePath && existsSync(skill.sourcePath)) {
+        const sourceFileCount = await this.countAdditionalFiles(skill.sourcePath, targetConfig.skillFileName);
+        const targetFileCount = existsSync(skillDir)
+          ? await this.countAdditionalFiles(skillDir, targetConfig.skillFileName)
+          : 0;
+        // If source has more files than target, we need to sync
+        if (sourceFileCount > targetFileCount) {
+          needsDirSync = true;
+          action = 'updated'; // Treat as update since we're adding files
+        }
+      }
+
+      if (action === 'unchanged' && !needsDirSync) {
         result.files.push({ path: relativePath, action, skillName: name });
         continue;
       }
