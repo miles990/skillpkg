@@ -3,10 +3,12 @@
  * @skillpkg/cli - Agent Skills Package Manager CLI
  */
 import { program } from 'commander';
+import { createRequire } from 'module';
 import { registerCommands } from './cli.js';
 
 // Get version from package.json
-const VERSION = '0.0.1';
+const require = createRequire(import.meta.url);
+const { version: VERSION } = require('../package.json');
 
 program
   .name('skillpkg')
