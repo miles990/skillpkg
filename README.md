@@ -248,7 +248,7 @@ skillpkg searches these locations in order:
 | Package | Version | Description |
 |---------|---------|-------------|
 | [skillpkg-cli](https://www.npmjs.com/package/skillpkg-cli) | 0.3.0 | Command-line interface |
-| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | 0.3.1 | MCP Server for AI agents |
+| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | 0.3.0 | MCP Server for AI agents |
 | [skillpkg-core](https://www.npmjs.com/package/skillpkg-core) | 0.3.0 | Core library |
 
 ## Storage Locations
