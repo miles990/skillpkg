@@ -7,7 +7,7 @@
 | M1 | 核心 Skills (必須) | ✅ | 4 個必須的核心 skills |
 | M2 | 工作流程 Skills | ✅ | 4 個提升效率的 skills |
 | M3 | Bundle 與整合 | ✅ | 建立套件、更新 evolve |
-| M4 | 測試與驗證 | ⏳ | 完整流程測試 |
+| M4 | 測試與驗證 | ✅ | 完整流程測試 |
 
 ---
 
@@ -114,25 +114,25 @@
 > 目標：驗證完整協作流程
 
 ### 4.1 單一 Skill 測試
-- [ ] 測試 smart-learning-loop
-- [ ] 測試 research
-- [ ] 測試 plan-master
-- [ ] 測試 goal-verifier
+- [x] 測試 smart-learning-loop
+- [x] 測試 research
+- [x] 測試 plan-master
+- [x] 測試 goal-verifier
 
 ### 4.2 協作流程測試
-- [ ] 測試串聯模式 (Pipeline)
-- [ ] 測試分工模式 (Delegation)
-- [ ] 測試 evolve 完整流程
+- [x] 測試串聯模式 (Pipeline)
+- [x] 測試分工模式 (Delegation)
+- [x] 測試 evolve 完整流程
 
 ### 4.3 跨平台測試
-- [ ] Claude Code 測試
+- [x] Claude Code 測試
 - [ ] (選) Codex 測試
 - [ ] (選) Copilot 測試
 
 **M4 驗收標準**：
-- [ ] 所有單一 skill 測試通過
-- [ ] 協作流程測試通過
-- [ ] 至少在 Claude Code 上正常運作
+- [x] 所有單一 skill 測試通過
+- [x] 協作流程測試通過
+- [x] 至少在 Claude Code 上正常運作
 
 ---
 
