@@ -9,6 +9,8 @@
 
 The package manager for AI agent skills. Works with **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, **Cursor**, and any platform that adopts the [Agent Skills open standard](https://agentskills.io).
 
+English | [繁體中文](./README-zh.md)
+
 ## The Problem
 
 ```
