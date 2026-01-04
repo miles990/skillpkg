@@ -17,6 +17,7 @@ import { infoCommand } from './commands/info.js';
 import { depsCommand, whyCommand, treeCommand } from './commands/deps.js';
 import { statusCommand } from './commands/status.js';
 import { newCommand } from './commands/new.js';
+import { doctorCommand } from './commands/doctor.js';
 // import { migrateCommand } from './commands/migrate.js'; // Hidden until needed
 
 /**
@@ -172,6 +173,15 @@ export function registerCommands(program: Command): void {
     .description('Show overall project status (skills, MCP, sync)')
     .option('--json', 'Output as JSON')
     .action(statusCommand);
+
+  // doctor - Diagnose and repair state
+  program
+    .command('doctor')
+    .description('Diagnose and repair skillpkg state inconsistencies')
+    .option('--fix', 'Automatically fix detected issues')
+    .option('--dry-run', 'Show what would be fixed without making changes')
+    .option('--json', 'Output as JSON')
+    .action(doctorCommand);
 
   // migrate - Migrate from v1.x to v2.0
   // Hidden: Not registered in CLI until public release needs migration support

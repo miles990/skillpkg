@@ -245,6 +245,68 @@ export class StateManager {
   }
 
   /**
+   * Get orphan state entries (skills in state but not on disk)
+   * @param state - Current state
+   * @param diskSkills - List of skill names that exist on disk
+   */
+  getOrphanStates(state: State, diskSkills: string[]): string[] {
+    const diskSet = new Set(diskSkills);
+    return Object.keys(state.skills).filter((name) => !diskSet.has(name));
+  }
+
+  /**
+   * Clean orphan state entries (skills in state but not on disk)
+   * Mirrors StoreManager.cleanOrphans() for consistency
+   * @param projectPath - Project path
+   * @param diskSkills - List of skill names that exist on disk
+   * @returns List of removed skill names
+   */
+  async cleanOrphanStates(projectPath: string, diskSkills: string[]): Promise<string[]> {
+    const state = await this.loadState(projectPath);
+    const orphans = this.getOrphanStates(state, diskSkills);
+
+    if (orphans.length > 0) {
+      for (const name of orphans) {
+        delete state.skills[name];
+      }
+      // Clean up depended_by references to orphans
+      const orphanSet = new Set(orphans);
+      for (const skillState of Object.values(state.skills)) {
+        skillState.depended_by = skillState.depended_by.filter(
+          (dep) => !orphanSet.has(dep)
+        );
+      }
+      await this.saveState(projectPath, state);
+    }
+
+    return orphans;
+  }
+
+  /**
+   * Clean dangling dependency references (depended_by pointing to non-existent skills)
+   * @returns Number of references cleaned
+   */
+  async cleanDanglingReferences(projectPath: string): Promise<number> {
+    const state = await this.loadState(projectPath);
+    const existingSkills = new Set(Object.keys(state.skills));
+    let cleanedCount = 0;
+
+    for (const skillState of Object.values(state.skills)) {
+      const before = skillState.depended_by.length;
+      skillState.depended_by = skillState.depended_by.filter((dep) =>
+        existingSkills.has(dep)
+      );
+      cleanedCount += before - skillState.depended_by.length;
+    }
+
+    if (cleanedCount > 0) {
+      await this.saveState(projectPath, state);
+    }
+
+    return cleanedCount;
+  }
+
+  /**
    * Record a sync operation
    */
   async recordSync(projectPath: string, target: SyncTarget): Promise<void> {

@@ -2,8 +2,6 @@
   "$schema": "https://skillpkg.dev/schemas/skillpkg.json",
   "name": "skillpkg",
   "skills": {
-    "evolve": "github:miles990/self-evolving-agent",
-    ".claude/skills/claude-code-hooks/SKILL.md": "github:daishiman/AIWorkflowOrchestrator#.claude/skills/claude-code-hooks",
     "mcp-builder": "github:davila7/claude-code-templates#cli-tool/components/skills/development/mcp-builder",
     "codebase-analysis": "github:solatis/claude-config#skills/codebase-analysis",
     "decision-critic": "github:solatis/claude-config#skills/decision-critic",

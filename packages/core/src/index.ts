@@ -53,3 +53,6 @@ export * from './fetcher/index.js';
 
 // Discovery module - Multi-source skill discovery
 export * from './discovery/index.js';
+
+// Doctor module - Diagnose and repair state
+export * from './doctor/index.js';
