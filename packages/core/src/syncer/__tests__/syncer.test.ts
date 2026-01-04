@@ -69,21 +69,20 @@ describe('TARGET_CONFIGS', () => {
     expect(TARGET_CONFIGS).toHaveProperty('windsurf');
   });
 
-  it('should have claude-code as implemented', () => {
+  it('should have all targets as implemented', () => {
     expect(TARGET_CONFIGS['claude-code'].implemented).toBe(true);
-  });
-
-  it('should mark other targets as not implemented', () => {
-    expect(TARGET_CONFIGS.cursor.implemented).toBe(false);
-    expect(TARGET_CONFIGS.codex.implemented).toBe(false);
-    expect(TARGET_CONFIGS.copilot.implemented).toBe(false);
-    expect(TARGET_CONFIGS.windsurf.implemented).toBe(false);
+    expect(TARGET_CONFIGS.cursor.implemented).toBe(true);
+    expect(TARGET_CONFIGS.codex.implemented).toBe(true);
+    expect(TARGET_CONFIGS.copilot.implemented).toBe(true);
+    expect(TARGET_CONFIGS.windsurf.implemented).toBe(true);
   });
 
   it('should have correct output paths', () => {
     expect(TARGET_CONFIGS['claude-code'].outputPath).toBe('.claude/skills');
     expect(TARGET_CONFIGS.cursor.outputPath).toBe('.cursor/rules');
-    expect(TARGET_CONFIGS.codex.outputPath).toBe('.');
+    expect(TARGET_CONFIGS.codex.outputPath).toBe('.agents');
+    expect(TARGET_CONFIGS.copilot.outputPath).toBe('.github');
+    expect(TARGET_CONFIGS.windsurf.outputPath).toBe('.windsurf/rules');
   });
 });
 
@@ -96,10 +95,16 @@ describe('getTargetConfig', () => {
 });
 
 describe('getImplementedTargets', () => {
-  it('should return only implemented targets', () => {
+  it('should return all implemented targets', () => {
     const implemented = getImplementedTargets();
-    expect(implemented.length).toBe(1);
-    expect(implemented[0].id).toBe('claude-code');
+    // All 5 platforms are now implemented
+    expect(implemented.length).toBe(5);
+    const ids = implemented.map((t) => t.id);
+    expect(ids).toContain('claude-code');
+    expect(ids).toContain('cursor');
+    expect(ids).toContain('codex');
+    expect(ids).toContain('copilot');
+    expect(ids).toContain('windsurf');
   });
 });
 
@@ -140,7 +145,7 @@ describe('Syncer', () => {
       expect(existsSync(skillFile)).toBe(true);
     });
 
-    it('should skip unimplemented targets', async () => {
+    it('should sync to cursor target successfully', async () => {
       const syncer = createSyncer();
       const skills = new Map<string, SkillContent>();
       skills.set('test-skill', createTestSkill('test-skill'));
@@ -152,10 +157,13 @@ describe('Syncer', () => {
 
       const result = await syncer.syncAll(TEST_DIR, skills, config);
 
-      // Should have one target result with error
+      // Should have one target result with success
       const cursorResult = result.targets.find((t) => t.target === 'cursor');
-      expect(cursorResult?.success).toBe(false);
-      expect(cursorResult?.errors[0]).toContain('not yet implemented');
+      expect(cursorResult?.success).toBe(true);
+
+      // Check file was created with correct name (.mdc extension)
+      const skillFile = join(TEST_DIR, '.cursor/rules/test-skill/rule.mdc');
+      expect(existsSync(skillFile)).toBe(true);
     });
 
     it('should detect unchanged files', async () => {

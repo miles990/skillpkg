@@ -46,6 +46,13 @@ export interface TargetConfig {
 
 /**
  * Target configurations for all supported platforms
+ *
+ * References:
+ * - Claude Code: https://docs.anthropic.com/claude-code
+ * - Cursor: https://cursor.com/docs/context/rules
+ * - Codex: https://developers.openai.com/codex/guides/agents-md/
+ * - Copilot: https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot
+ * - Windsurf: https://docs.windsurf.com/windsurf/cascade/memories
  */
 export const TARGET_CONFIGS: Record<SyncTarget, TargetConfig> = {
   'claude-code': {
@@ -65,24 +72,24 @@ export const TARGET_CONFIGS: Record<SyncTarget, TargetConfig> = {
     displayName: 'Cursor',
     format: 'directory',
     outputPath: '.cursor/rules',
-    skillFileName: 'rule.md',
+    skillFileName: 'rule.mdc', // Cursor uses .mdc extension
     frontmatter: 'remove',
     extension: '.md',
-    mcpConfigPath: undefined, // Cursor doesn't support MCP yet
-    implemented: false, // Reserved for future
-    description: 'Cursor IDE rules directory',
+    mcpConfigPath: undefined, // Cursor doesn't use MCP config file
+    implemented: true,
+    description: 'Cursor IDE rules directory (.cursor/rules/*.mdc)',
   },
   codex: {
     id: 'codex',
     displayName: 'OpenAI Codex CLI',
-    format: 'single-file',
-    outputPath: '.',
+    format: 'directory', // Codex supports per-directory AGENTS.md
+    outputPath: '.agents',
     skillFileName: 'AGENTS.md',
     frontmatter: 'remove',
     extension: '.md',
     mcpConfigPath: undefined,
-    implemented: false, // Reserved for future
-    description: 'OpenAI Codex CLI agents file',
+    implemented: true,
+    description: 'OpenAI Codex CLI agents directory',
   },
   copilot: {
     id: 'copilot',
@@ -93,8 +100,8 @@ export const TARGET_CONFIGS: Record<SyncTarget, TargetConfig> = {
     frontmatter: 'remove',
     extension: '.md',
     mcpConfigPath: undefined,
-    implemented: false, // Reserved for future
-    description: 'GitHub Copilot instructions file',
+    implemented: true,
+    description: 'GitHub Copilot instructions file (.github/copilot-instructions.md)',
   },
   windsurf: {
     id: 'windsurf',
@@ -105,8 +112,8 @@ export const TARGET_CONFIGS: Record<SyncTarget, TargetConfig> = {
     frontmatter: 'remove',
     extension: '.md',
     mcpConfigPath: undefined,
-    implemented: false, // Reserved for future
-    description: 'Windsurf rules directory',
+    implemented: true,
+    description: 'Windsurf Cascade rules directory (.windsurf/rules/*.md)',
   },
 };
 
