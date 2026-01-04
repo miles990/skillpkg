@@ -24,10 +24,12 @@ Manage, share, and sync AI agent skills across platforms. Works with **Claude Co
 
 ## Features
 
-- **Search skills on GitHub** — Find skills with `SKILL.md` files (industry standard)
+- **Multi-source search** — Search local, GitHub, awesome repos, and skillsmp.com (40K+ skills)
+- **Full directory support** — Skills with scripts, templates, and resources are fully supported
+- **Subpath installation** — Install from subdirectories: `github:user/repo#path/to/skill`
 - **Cross-platform sync** — One skill, multiple AI platforms
-- **Dependency management** — Automatic skill dependency resolution (v2.0)
-- **Project configuration** — `skillpkg.json` for reproducible setups (v2.0)
+- **Dependency management** — Automatic skill & MCP dependency resolution
+- **Project configuration** — `skillpkg.json` for reproducible setups
 - **MCP Server** — Let AI agents install, uninstall, and sync skills
 - **CLI & API** — Flexible integration options
 
@@ -42,20 +44,27 @@ npm install -g skillpkg-cli
 ### Search for Skills
 
 ```bash
-# Search for skills on GitHub
+# Search across multiple sources (local → awesome → github)
 skillpkg search "git commit"
 
 # Example output:
-# commit-helper ✓ SKILL.md ⭐1.2K
-#   anthropics/claude-code-skills
-#   AI-powered git commit message generator
+# Found 8 skills (3 duplicates removed):
+#
+#   git-helper  ⭐120
+#   github:alice/tools#git-helper
+#   Also in: travisvn/awesome-claude-skills
+#
+# Install: skillpkg install <source>
 ```
 
 ### Install a Skill
 
 ```bash
-# From GitHub (recommended)
+# From GitHub repository
 skillpkg install github:anthropics/claude-code-skills
+
+# From subdirectory (subpath support)
+skillpkg install github:user/repo#skills/my-skill
 
 # Shorthand format
 skillpkg install anthropics/claude-code-skills
@@ -89,6 +98,7 @@ skillpkg sync my-skill --target claude-code,codex
 | Command | Description |
 |---------|-------------|
 | `skillpkg init` | Initialize a project with skillpkg.json |
+| `skillpkg new [name]` | Create a new skill (SKILL.md) |
 | `skillpkg install [source]` | Install skill(s) with dependency resolution |
 | `skillpkg uninstall <skill>` | Remove a skill (checks dependencies) |
 | `skillpkg list` | List installed skills with dependency info |
@@ -97,11 +107,10 @@ skillpkg sync my-skill --target claude-code,codex
 | `skillpkg deps <skill>` | Show dependencies of a skill |
 | `skillpkg why <skill>` | Show why a skill is installed |
 | `skillpkg tree` | Show full dependency tree |
-| `skillpkg search <query>` | Search for skills on GitHub |
+| `skillpkg search <query>` | Search for skills (multi-source) |
 | `skillpkg info <skill>` | Get detailed skill information |
 | `skillpkg import [path]` | Import existing skills from platform formats |
 | `skillpkg export [skill]` | Export skills to various formats |
-| `skillpkg migrate` | Migrate from v1.x to v2.0 |
 
 ### Install Sources
 
@@ -110,16 +119,39 @@ skillpkg sync my-skill --target claude-code,codex
 skillpkg install github:user/repo
 skillpkg install user/repo
 
+# GitHub subdirectory (subpath)
+skillpkg install github:user/repo#skills/my-skill
+
 # GitHub Gist
 skillpkg install gist:abc123
 
 # Direct URL
-skillpkg install https://example.com/skill.yaml
+skillpkg install https://example.com/SKILL.md
 
 # Local path
 skillpkg install ./path/to/skill
 skillpkg install /absolute/path/to/skill
 ```
+
+## Skill Directory Support
+
+Skills can include additional files beyond SKILL.md. When installing, skillpkg downloads the entire directory:
+
+```
+my-skill/
+├── SKILL.md              # Required: skill definition
+├── scripts/
+│   └── main.py           # Python scripts
+├── templates/
+│   └── email.html        # Template files
+├── config/
+│   └── settings.json     # Configuration
+└── resources/
+    └── images/
+        └── icon.png      # Binary files (images, etc.)
+```
+
+All files are preserved during install and sync, maintaining the original directory structure.
 
 ## MCP Server
 
@@ -157,13 +189,15 @@ claude mcp add skillpkg -- npx -y skillpkg-mcp-server
 | Tool | Description |
 |------|-------------|
 | `list_skills` | List installed skills with dependency info |
-| `search_skills` | Search for skills on GitHub |
+| `search_skills` | Search for skills (multi-source: local, awesome, github) |
 | `recommend_skill` | Get skill recommendations for a use case |
 | `install_skill` | Install a skill with dependency resolution |
 | `uninstall_skill` | Remove a skill (with dependency check) |
-| `sync_skills` | Sync skills to AI platforms (v2.0) |
+| `sync_skills` | Sync skills to AI platforms |
 | `load_skill` | Load a skill's instructions |
-| `skill_info` | Get detailed information about a registry skill |
+| `skill_info` | Get detailed information about an installed skill |
+| `skill_status` | Show overall project status |
+| `create_skill` | Create a new skill with SKILL.md format |
 
 ### Example: AI Self-Learning
 
@@ -182,7 +216,7 @@ Claude: I'll search for a relevant skill...
         Now I can help you write better commits!
 ```
 
-## Project Configuration (v2.0)
+## Project Configuration
 
 Create a `skillpkg.json` to manage project skills:
 
@@ -216,6 +250,11 @@ The industry standard format for AI agent skills, used by Claude Code and OpenAI
 name: my-skill
 version: 1.0.0
 description: A helpful skill for doing X
+dependencies:
+  skills:
+    - github:some/other-skill
+  mcp:
+    - package: "@some/mcp-server"
 ---
 
 # My Skill
@@ -247,9 +286,9 @@ skillpkg searches these locations in order:
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| [skillpkg-cli](https://www.npmjs.com/package/skillpkg-cli) | 0.4.0 | Command-line interface |
-| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | 0.4.0 | MCP Server for AI agents |
-| [skillpkg-core](https://www.npmjs.com/package/skillpkg-core) | 0.4.0 | Core library |
+| [skillpkg-cli](https://www.npmjs.com/package/skillpkg-cli) | 0.5.5 | Command-line interface |
+| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | 0.5.5 | MCP Server for AI agents |
+| [skillpkg-core](https://www.npmjs.com/package/skillpkg-core) | 0.5.5 | Core library |
 
 ## Storage Locations
 
@@ -264,6 +303,9 @@ skillpkg searches these locations in order:
 |----------|-------------|
 | `GITHUB_TOKEN` | GitHub API token for higher rate limits |
 | `SKILLPKG_HOME` | Custom global storage path |
+| `SKILLSMP_API_KEY` | API key for skillsmp.com (40K+ skills) |
+
+You can also use a `.env` file in your project root or `~/.skillpkg/.env` for global settings.
 
 ## Development
 
@@ -278,7 +320,7 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Run tests
+# Run tests (246 tests)
 pnpm test
 
 # Development mode
