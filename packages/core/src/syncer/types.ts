@@ -45,14 +45,16 @@ export interface TargetConfig {
 }
 
 /**
- * Target configurations for all supported platforms
+ * Target configurations for Agent Skills standard adopters
  *
- * References:
- * - Claude Code: https://docs.anthropic.com/claude-code
- * - Cursor: https://cursor.com/docs/context/rules
- * - Codex: https://developers.openai.com/codex/guides/agents-md/
- * - Copilot: https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot
- * - Windsurf: https://docs.windsurf.com/windsurf/cascade/memories
+ * All platforms use the open Agent Skills specification (SKILL.md format)
+ * Reference: https://agentskills.io/specification
+ *
+ * Official adopters:
+ * - Claude Code: https://code.claude.com/docs/en/skills
+ * - Cursor: https://cursor.com/docs/context/skills
+ * - OpenAI Codex: https://developers.openai.com/codex/skills/
+ * - GitHub Copilot: https://code.visualstudio.com/docs/copilot/customization/agent-skills
  */
 export const TARGET_CONFIGS: Record<SyncTarget, TargetConfig> = {
   'claude-code': {
@@ -65,55 +67,43 @@ export const TARGET_CONFIGS: Record<SyncTarget, TargetConfig> = {
     extension: '.md',
     mcpConfigPath: '.mcp.json',
     implemented: true,
-    description: 'Claude Code CLI tool skills directory',
+    description: 'Claude Code CLI skills directory (.claude/skills/)',
   },
   cursor: {
     id: 'cursor',
     displayName: 'Cursor',
     format: 'directory',
-    outputPath: '.cursor/rules',
-    skillFileName: 'rule.mdc', // Cursor uses .mdc extension
-    frontmatter: 'remove',
-    extension: '.md',
-    mcpConfigPath: undefined, // Cursor doesn't use MCP config file
-    implemented: true,
-    description: 'Cursor IDE rules directory (.cursor/rules/*.mdc)',
-  },
-  codex: {
-    id: 'codex',
-    displayName: 'OpenAI Codex CLI',
-    format: 'directory', // Codex supports per-directory AGENTS.md
-    outputPath: '.agents',
-    skillFileName: 'AGENTS.md',
-    frontmatter: 'remove',
+    outputPath: '.cursor/skills',
+    skillFileName: 'SKILL.md',
+    frontmatter: 'keep',
     extension: '.md',
     mcpConfigPath: undefined,
     implemented: true,
-    description: 'OpenAI Codex CLI agents directory',
+    description: 'Cursor IDE skills directory (.cursor/skills/)',
+  },
+  codex: {
+    id: 'codex',
+    displayName: 'OpenAI Codex',
+    format: 'directory',
+    outputPath: '.codex/skills',
+    skillFileName: 'SKILL.md',
+    frontmatter: 'keep',
+    extension: '.md',
+    mcpConfigPath: undefined,
+    implemented: true,
+    description: 'OpenAI Codex CLI skills directory (.codex/skills/)',
   },
   copilot: {
     id: 'copilot',
     displayName: 'GitHub Copilot',
-    format: 'single-file',
-    outputPath: '.github',
-    skillFileName: 'copilot-instructions.md',
-    frontmatter: 'remove',
-    extension: '.md',
-    mcpConfigPath: undefined,
-    implemented: true,
-    description: 'GitHub Copilot instructions file (.github/copilot-instructions.md)',
-  },
-  windsurf: {
-    id: 'windsurf',
-    displayName: 'Windsurf',
     format: 'directory',
-    outputPath: '.windsurf/rules',
-    skillFileName: 'rule.md',
-    frontmatter: 'remove',
+    outputPath: '.github/skills',
+    skillFileName: 'SKILL.md',
+    frontmatter: 'keep',
     extension: '.md',
     mcpConfigPath: undefined,
     implemented: true,
-    description: 'Windsurf Cascade rules directory (.windsurf/rules/*.md)',
+    description: 'GitHub Copilot skills directory (.github/skills/)',
   },
 };
 

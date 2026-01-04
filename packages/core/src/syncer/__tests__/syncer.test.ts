@@ -61,12 +61,11 @@ async function cleanupTestDir(): Promise<void> {
 }
 
 describe('TARGET_CONFIGS', () => {
-  it('should have configuration for all sync targets', () => {
+  it('should have configuration for all Agent Skills adopters', () => {
     expect(TARGET_CONFIGS).toHaveProperty('claude-code');
     expect(TARGET_CONFIGS).toHaveProperty('cursor');
     expect(TARGET_CONFIGS).toHaveProperty('codex');
     expect(TARGET_CONFIGS).toHaveProperty('copilot');
-    expect(TARGET_CONFIGS).toHaveProperty('windsurf');
   });
 
   it('should have all targets as implemented', () => {
@@ -74,15 +73,20 @@ describe('TARGET_CONFIGS', () => {
     expect(TARGET_CONFIGS.cursor.implemented).toBe(true);
     expect(TARGET_CONFIGS.codex.implemented).toBe(true);
     expect(TARGET_CONFIGS.copilot.implemented).toBe(true);
-    expect(TARGET_CONFIGS.windsurf.implemented).toBe(true);
+  });
+
+  it('should use SKILL.md for all targets (Agent Skills standard)', () => {
+    expect(TARGET_CONFIGS['claude-code'].skillFileName).toBe('SKILL.md');
+    expect(TARGET_CONFIGS.cursor.skillFileName).toBe('SKILL.md');
+    expect(TARGET_CONFIGS.codex.skillFileName).toBe('SKILL.md');
+    expect(TARGET_CONFIGS.copilot.skillFileName).toBe('SKILL.md');
   });
 
   it('should have correct output paths', () => {
     expect(TARGET_CONFIGS['claude-code'].outputPath).toBe('.claude/skills');
-    expect(TARGET_CONFIGS.cursor.outputPath).toBe('.cursor/rules');
-    expect(TARGET_CONFIGS.codex.outputPath).toBe('.agents');
-    expect(TARGET_CONFIGS.copilot.outputPath).toBe('.github');
-    expect(TARGET_CONFIGS.windsurf.outputPath).toBe('.windsurf/rules');
+    expect(TARGET_CONFIGS.cursor.outputPath).toBe('.cursor/skills');
+    expect(TARGET_CONFIGS.codex.outputPath).toBe('.codex/skills');
+    expect(TARGET_CONFIGS.copilot.outputPath).toBe('.github/skills');
   });
 });
 
@@ -97,21 +101,20 @@ describe('getTargetConfig', () => {
 describe('getImplementedTargets', () => {
   it('should return all implemented targets', () => {
     const implemented = getImplementedTargets();
-    // All 5 platforms are now implemented
-    expect(implemented.length).toBe(5);
+    // All 4 Agent Skills adopters are implemented
+    expect(implemented.length).toBe(4);
     const ids = implemented.map((t) => t.id);
     expect(ids).toContain('claude-code');
     expect(ids).toContain('cursor');
     expect(ids).toContain('codex');
     expect(ids).toContain('copilot');
-    expect(ids).toContain('windsurf');
   });
 });
 
 describe('getAllTargets', () => {
   it('should return all targets', () => {
     const all = getAllTargets();
-    expect(all.length).toBe(5);
+    expect(all.length).toBe(4);
   });
 });
 
@@ -161,8 +164,8 @@ describe('Syncer', () => {
       const cursorResult = result.targets.find((t) => t.target === 'cursor');
       expect(cursorResult?.success).toBe(true);
 
-      // Check file was created with correct name (.mdc extension)
-      const skillFile = join(TEST_DIR, '.cursor/rules/test-skill/rule.mdc');
+      // Check file was created with correct path (Agent Skills standard)
+      const skillFile = join(TEST_DIR, '.cursor/skills/test-skill/SKILL.md');
       expect(existsSync(skillFile)).toBe(true);
     });
 
@@ -292,15 +295,16 @@ describe('Syncer', () => {
       expect(result).toContain('name: test');
     });
 
-    it('should remove frontmatter for codex', () => {
+    it('should keep frontmatter for codex (Agent Skills standard)', () => {
       const syncer = createSyncer();
       const skill = createTestSkill('test');
       const targetConfig = getTargetConfig('codex');
 
       const result = syncer.transformForTarget(skill, targetConfig);
 
-      expect(result).not.toContain('---');
-      expect(result).not.toContain('name: test');
+      // All Agent Skills adopters use the same SKILL.md format with frontmatter
+      expect(result).toContain('---');
+      expect(result).toContain('name: test');
       expect(result).toContain('This is the instruction content');
     });
   });

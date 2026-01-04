@@ -21,10 +21,10 @@ export interface McpConfig {
 }
 
 /**
- * Supported sync targets
- * Note: v2.0 only implements claude-code, others are reserved for future
+ * Supported sync targets (Agent Skills standard adopters)
+ * Reference: https://agentskills.io
  */
-export type SyncTarget = 'claude-code' | 'cursor' | 'codex' | 'copilot' | 'windsurf';
+export type SyncTarget = 'claude-code' | 'cursor' | 'codex' | 'copilot';
 
 /**
  * Sync targets configuration
@@ -72,7 +72,6 @@ export const DEFAULT_SYNC_TARGETS: SyncTargets = {
   cursor: false,
   codex: false,
   copilot: false,
-  windsurf: false,
 };
 
 /**
