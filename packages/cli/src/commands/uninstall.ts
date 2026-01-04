@@ -18,6 +18,7 @@ interface UninstallOptions {
   global?: boolean;
   clean?: boolean;
   force?: boolean;
+  dryRun?: boolean;
 }
 
 /**
@@ -75,6 +76,37 @@ export async function uninstallCommand(
       logger.warn('Warning: This may break the dependent skills!');
       process.exit(1);
     }
+  }
+
+  // Dry-run mode: show what would be removed without making changes
+  if (options.dryRun) {
+    const result = await installer.uninstall(cwd, skillName, {
+      force: options.force,
+      removeOrphans: true,
+      dryRun: true,
+    });
+
+    logger.header('Dry Run - No changes made');
+    logger.blank();
+    logger.log(colors.bold('Would remove:'));
+    logger.item(`${colors.cyan(skillName)}@${version}`);
+
+    if (result.orphansRemoved.length > 0) {
+      logger.blank();
+      logger.log(colors.bold('Would also remove orphan dependencies:'));
+      for (const orphan of result.orphansRemoved) {
+        logger.item(colors.dim(orphan));
+      }
+    }
+
+    if (options.clean) {
+      logger.blank();
+      logger.log(colors.bold('Would clean synced files from all platforms'));
+    }
+
+    logger.blank();
+    logger.log(`Run without ${colors.cyan('--dry-run')} to apply changes.`);
+    return;
   }
 
   // Perform uninstall

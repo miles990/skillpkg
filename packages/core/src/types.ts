@@ -2,6 +2,45 @@
  * Core types for skillpkg
  */
 
+// ============================================================================
+// Result Types - Standard pattern for operation results
+// ============================================================================
+
+/**
+ * Base result interface for all operations
+ *
+ * This is the recommended pattern for all Result types in skillpkg.
+ * New Result types should extend this interface for consistency.
+ *
+ * @example
+ * ```typescript
+ * export interface MyOperationResult extends BaseResult {
+ *   data: MyData;
+ *   stats: MyStats;
+ * }
+ * ```
+ */
+export interface BaseResult {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Error messages if operation failed */
+  errors: string[];
+  /** Warning messages (optional) */
+  warnings?: string[];
+}
+
+/**
+ * Result with optional data payload
+ */
+export interface DataResult<T> extends BaseResult {
+  /** Result data (only present on success) */
+  data?: T;
+}
+
+// ============================================================================
+// Schema Types
+// ============================================================================
+
 /**
  * Skill schema version
  */

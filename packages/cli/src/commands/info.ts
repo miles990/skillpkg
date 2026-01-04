@@ -4,7 +4,7 @@
 import { createGlobalStore, createLocalStore, getSkillMdPath } from 'skillpkg-core';
 import { logger, colors } from '../ui/index.js';
 
-interface InfoCommandOptions {
+interface InfoOptions {
   json?: boolean;
   global?: boolean;
 }
@@ -14,7 +14,7 @@ interface InfoCommandOptions {
  */
 export async function infoCommand(
   skillName: string | undefined,
-  options: InfoCommandOptions
+  options: InfoOptions
 ): Promise<void> {
   if (!skillName) {
     logger.error('Skill name is required');

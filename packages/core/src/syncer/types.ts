@@ -2,6 +2,7 @@
  * Syncer types - Sync skills to AI tool directories
  */
 import type { SyncTarget } from '../config/types.js';
+import type { BaseResult } from '../types.js';
 
 /**
  * Sync format type
@@ -173,17 +174,11 @@ export interface FileSyncResult {
 /**
  * Target sync result
  */
-export interface TargetSyncResult {
+export interface TargetSyncResult extends BaseResult {
   /** Target ID */
   target: SyncTarget;
-  /** Whether sync was successful */
-  success: boolean;
   /** Files synced */
   files: FileSyncResult[];
-  /** Errors if any */
-  errors: string[];
-  /** Warning messages */
-  warnings: string[];
 }
 
 /**

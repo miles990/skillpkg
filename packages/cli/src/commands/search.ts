@@ -15,7 +15,7 @@ import {
 } from 'skillpkg-core';
 import { logger, colors } from '../ui/index.js';
 
-interface SearchCommandOptions {
+interface SearchOptions {
   limit?: string;
   source?: string;
   json?: boolean;
@@ -26,7 +26,7 @@ interface SearchCommandOptions {
  */
 export async function searchCommand(
   query: string | undefined,
-  options: SearchCommandOptions
+  options: SearchOptions
 ): Promise<void> {
   if (!query) {
     logger.error('Search query is required');

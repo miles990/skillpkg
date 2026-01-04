@@ -65,6 +65,7 @@ export function registerCommands(program: Command): void {
     .option('-g, --global', 'Uninstall from global store')
     .option('-c, --clean', 'Also remove synced files from all platforms')
     .option('-f, --force', 'Force uninstall even if other skills depend on it')
+    .option('--dry-run', 'Show what would be removed without making changes')
     .action(uninstallCommand);
 
   // sync - Sync skills to platforms

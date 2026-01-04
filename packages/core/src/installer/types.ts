@@ -1,7 +1,7 @@
 /**
  * Installer types - Dependency-aware skill installation
  */
-import type { Skill } from '../types.js';
+import type { Skill, BaseResult } from '../types.js';
 import type { SkillFile } from '../fetcher/types.js';
 
 /**
@@ -50,15 +50,11 @@ export interface SkillInstallResult {
 /**
  * Overall install result
  */
-export interface InstallResult {
-  /** Whether overall installation succeeded */
-  success: boolean;
+export interface InstallResult extends BaseResult {
   /** Individual skill results */
   skills: SkillInstallResult[];
   /** MCP servers that need manual installation */
   mcpRequired: string[];
-  /** Errors during installation */
-  errors: string[];
   /** Summary stats */
   stats: {
     installed: number;
@@ -94,15 +90,11 @@ export interface InstallerUninstallCheck {
 /**
  * Uninstall result
  */
-export interface UninstallResult {
-  /** Whether uninstall succeeded */
-  success: boolean;
+export interface UninstallResult extends BaseResult {
   /** Skills that were removed */
   removed: string[];
   /** Orphan dependencies that were cleaned */
   orphansRemoved: string[];
-  /** Errors during uninstall */
-  errors: string[];
 }
 
 /**

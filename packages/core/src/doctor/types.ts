@@ -3,6 +3,7 @@
  *
  * Types for diagnosing and repairing skillpkg state
  */
+import type { BaseResult } from '../types.js';
 
 /**
  * Issue severity levels
@@ -75,10 +76,8 @@ export interface RepairAction {
 /**
  * Repair result
  */
-export interface RepairResult {
-  success: boolean;
+export interface RepairResult extends BaseResult {
   actions: RepairAction[];
-  errors: string[];
   issuesFixed: number;
   issuesRemaining: number;
 }

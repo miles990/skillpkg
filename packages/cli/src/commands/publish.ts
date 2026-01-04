@@ -12,10 +12,10 @@ import {
   RegistryError,
   DEFAULT_REGISTRY_URL,
 } from 'skillpkg-core';
-import type { Skill, PublishOptions } from 'skillpkg-core';
+import type { Skill, PublishOptions as CorePublishOptions } from 'skillpkg-core';
 import { logger, colors, withSpinner, confirm } from '../ui/index.js';
 
-interface PublishCommandOptions {
+interface PublishOptions {
   tag?: string;
   access?: string;
   registry?: string;
@@ -25,7 +25,7 @@ interface PublishCommandOptions {
 /**
  * publish command handler
  */
-export async function publishCommand(options: PublishCommandOptions): Promise<void> {
+export async function publishCommand(options: PublishOptions): Promise<void> {
   const registryUrl = options.registry || DEFAULT_REGISTRY_URL;
 
   logger.header('Publish Skill');
@@ -126,7 +126,7 @@ export async function publishCommand(options: PublishCommandOptions): Promise<vo
 
   // Publish to registry
   const client = createRegistryClient({ registryUrl });
-  const publishOptions: PublishOptions = {};
+  const publishOptions: CorePublishOptions = {};
 
   if (options.tag) {
     publishOptions.tag = options.tag;

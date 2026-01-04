@@ -11,7 +11,7 @@ import {
 } from 'skillpkg-core';
 import { logger, colors, createPrompt } from '../ui/index.js';
 
-interface LoginCommandOptions {
+interface LoginOptions {
   registry?: string;
   token?: string;
 }
@@ -19,7 +19,7 @@ interface LoginCommandOptions {
 /**
  * login command handler
  */
-export async function loginCommand(options: LoginCommandOptions): Promise<void> {
+export async function loginCommand(options: LoginOptions): Promise<void> {
   const registryUrl = options.registry || DEFAULT_REGISTRY_URL;
 
   logger.header('Login to Registry');
