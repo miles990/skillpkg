@@ -1,0 +1,89 @@
+{
+  "$schema": "https://skillpkg.dev/schemas/skillpkg.json",
+  "name": "smart-agent-core",
+  "version": "1.0.0",
+  "description": "智慧 Agent 核心技能套件：自我學習、規劃、協作、經驗傳承",
+  "author": "miles990",
+  "license": "MIT",
+  "repository": "github:miles990/skillpkg",
+  "keywords": [
+    "agent",
+    "self-learning",
+    "planning",
+    "pdca",
+    "skill-collaboration"
+  ],
+
+  "skills": {
+    "smart-learning-loop": "github:miles990/skillpkg#skills/smart-learning-loop",
+    "research": "github:miles990/skillpkg#skills/research",
+    "plan-master": "github:miles990/skillpkg#skills/plan-master",
+    "goal-verifier": "github:miles990/skillpkg#skills/goal-verifier",
+    "code-reviewer": "github:miles990/skillpkg#skills/code-reviewer",
+    "test-helper": "github:miles990/skillpkg#skills/test-helper",
+    "git-helper": "github:miles990/skillpkg#skills/git-helper",
+    "debug-helper": "github:miles990/skillpkg#skills/debug-helper"
+  },
+
+  "mcp": {
+    "skillpkg": {
+      "package": "skillpkg-mcp-server",
+      "required": true,
+      "note": "技能搜尋/安裝/載入"
+    },
+    "cipher": {
+      "package": "@anthropic/cipher-mcp",
+      "required": true,
+      "note": "經驗記憶與檢索"
+    },
+    "pal": {
+      "package": "pal-mcp-server",
+      "required": false,
+      "note": "用於 code-reviewer 和 debug-helper"
+    },
+    "context7": {
+      "package": "@context7/mcp-server",
+      "required": false,
+      "note": "用於 research 查詢文件"
+    }
+  },
+
+  "skill_workflows": {
+    "development": [
+      "research",
+      "plan-master",
+      "smart-learning-loop",
+      "code-reviewer",
+      "test-helper",
+      "goal-verifier",
+      "git-helper"
+    ],
+    "learning": [
+      "smart-learning-loop"
+    ],
+    "debugging": [
+      "debug-helper",
+      "test-helper"
+    ],
+    "planning": [
+      "research",
+      "plan-master",
+      "goal-verifier"
+    ]
+  },
+
+  "install": {
+    "core": [
+      "smart-learning-loop",
+      "research",
+      "plan-master",
+      "goal-verifier"
+    ],
+    "workflow": [
+      "code-reviewer",
+      "test-helper",
+      "git-helper",
+      "debug-helper"
+    ]
+  }
+}
