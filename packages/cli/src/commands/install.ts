@@ -24,6 +24,7 @@ import { logger, colors, withSpinner } from '../ui/index.js';
 interface InstallOptions {
   global?: boolean;
   registry?: string;
+  dryRun?: boolean;
 }
 
 /**
@@ -63,12 +64,18 @@ export async function installCommand(
 
   const installer = createInstaller(stateManager, configManager, storeManager, fetcher);
 
+  // Dry run mode
+  if (options.dryRun) {
+    logger.info('Dry run mode - no changes will be made');
+    logger.blank();
+  }
+
   logger.info(`Installing from ${colors.cyan(skillArg)}`);
   logger.blank();
 
   // Run installation
   const result = await withSpinner('Resolving dependencies', async () => {
-    return installer.install(cwd, source);
+    return installer.install(cwd, source, { dryRun: options.dryRun });
   });
 
   // Show results
@@ -87,8 +94,11 @@ export async function installCommand(
   const updated = result.skills.filter((s) => s.action === 'updated');
   const skipped = result.skills.filter((s) => s.action === 'skipped');
 
+  const actionVerb = options.dryRun ? 'Would install' : 'Installed';
+  const updateVerb = options.dryRun ? 'Would update' : 'Updated';
+
   if (installed.length > 0) {
-    logger.success(`Installed ${installed.length} skill(s):`);
+    logger.success(`${actionVerb} ${installed.length} skill(s):`);
     for (const skill of installed) {
       const transitiveNote = skill.transitive
         ? colors.dim(` (dependency of ${skill.requiredBy})`)
@@ -98,7 +108,7 @@ export async function installCommand(
   }
 
   if (updated.length > 0) {
-    logger.log(`Updated ${updated.length} skill(s):`);
+    logger.log(`${updateVerb} ${updated.length} skill(s):`);
     for (const skill of updated) {
       logger.item(`${colors.cyan(skill.name)} ${colors.dim(`v${skill.version}`)}`);
     }
@@ -149,6 +159,12 @@ async function installFromConfig(cwd: string, options: InstallOptions): Promise<
     return;
   }
 
+  // Dry run mode
+  if (options.dryRun) {
+    logger.info('Dry run mode - no changes will be made');
+    logger.blank();
+  }
+
   logger.info(`Installing ${skills.length} skill(s) from skillpkg.json`);
   logger.blank();
 
@@ -164,7 +180,7 @@ async function installFromConfig(cwd: string, options: InstallOptions): Promise<
   const installer = createInstaller(stateManager, configManager, storeManager, fetcher);
 
   const result = await withSpinner('Installing skills', async () => {
-    return installer.installFromConfig(cwd);
+    return installer.installFromConfig(cwd, { dryRun: options.dryRun });
   });
 
   logger.blank();

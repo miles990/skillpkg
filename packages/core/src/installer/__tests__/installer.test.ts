@@ -9,7 +9,7 @@ import { Installer, createInstaller } from '../installer.js';
 import type { SkillFetcherAdapter, InstallOptions, UninstallOptions } from '../types.js';
 import { StateManager, createStateManager } from '../../state/index.js';
 import { ConfigManager, createConfigManager } from '../../config/index.js';
-import { StoreManager } from '../../store/manager.js';
+import { StoreManager } from '../../store/store-manager.js';
 import type { Skill } from '../../types.js';
 
 // Test directories

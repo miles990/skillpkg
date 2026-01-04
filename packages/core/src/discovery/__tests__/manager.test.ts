@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { DiscoveryManager, createDiscoveryManager } from '../manager.js';
-import { StoreManager } from '../../store/manager.js';
+import { DiscoveryManager, createDiscoveryManager } from '../discovery-manager.js';
+import { StoreManager } from '../../store/store-manager.js';
 import type { DiscoveredSkill, DiscoverySource } from '../types.js';
 
 describe('DiscoveryManager', () => {

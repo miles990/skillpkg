@@ -15,8 +15,8 @@
  */
 
 // Main exports
-export { StoreManager, createGlobalStore, createLocalStore } from './manager.js';
-export type { StoreOptions, SkillMeta } from './manager.js';
+export { StoreManager, createGlobalStore, createLocalStore } from './store-manager.js';
+export type { StoreOptions, SkillMeta } from './store-manager.js';
 
 // Path utilities
 export {

@@ -28,12 +28,13 @@ export async function fetchSkill(
     if (!result.skill) {
       return {
         success: false,
-        error: `Failed to fetch skill from: ${source}`,
+        errors: [`Failed to fetch skill from: ${source}`],
       };
     }
 
     return {
       success: true,
+      errors: [],
       skill: result.skill,
       files: result.files.length > 0 ? result.files : undefined,
       sourceUrl: normalizeSource(source),
@@ -41,7 +42,7 @@ export async function fetchSkill(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      errors: [error instanceof Error ? error.message : String(error)],
     };
   }
 }

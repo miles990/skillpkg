@@ -26,7 +26,7 @@ export type {
 } from './types.js';
 
 // Manager
-export { DiscoveryManager, createDiscoveryManager } from './manager.js';
+export { DiscoveryManager, createDiscoveryManager } from './discovery-manager.js';
 
 // Providers
 export {

@@ -1,7 +1,7 @@
 /**
  * Fetcher types
  */
-import type { Skill } from '../types.js';
+import type { Skill, BaseResult } from '../types.js';
 
 /**
  * Supported source types
@@ -35,12 +35,10 @@ export interface SkillFile {
 /**
  * Fetch result
  */
-export interface FetchResult {
-  success: boolean;
+export interface FetchResult extends BaseResult {
   skill?: Skill;
   /** Additional files in the skill directory */
   files?: SkillFile[];
-  error?: string;
   /** Source URL for tracking */
   sourceUrl?: string;
 }

@@ -6,7 +6,7 @@ import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { StoreManager, createGlobalStore, createLocalStore } from '../manager.js';
+import { StoreManager, createGlobalStore, createLocalStore } from '../store-manager.js';
 import type { Skill } from '../../types.js';
 
 describe('StoreManager', () => {

@@ -23,4 +23,4 @@ export { CopilotAdapter } from './copilot.js';
 export { ClineAdapter } from './cline.js';
 
 // Manager
-export { AdapterManager, createAdapterManager } from './manager.js';
+export { AdapterManager, createAdapterManager } from './adapter-manager.js';

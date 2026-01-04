@@ -6,7 +6,7 @@
  */
 import type { StateManager } from '../state/index.js';
 import type { ConfigManager } from '../config/index.js';
-import type { StoreManager } from '../store/manager.js';
+import type { StoreManager } from '../store/store-manager.js';
 import type { SkillFetcher } from '../resolver/types.js';
 import {
   DependencyResolver,

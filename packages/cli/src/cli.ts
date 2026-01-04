@@ -46,6 +46,7 @@ export function registerCommands(program: Command): void {
     .description('Install a skill from registry or local path')
     .option('-g, --global', 'Install globally')
     .option('--registry <url>', 'Use custom registry')
+    .option('--dry-run', 'Show what would be installed without making changes')
     .action(installCommand);
 
   // list - List installed skills

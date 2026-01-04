@@ -1,7 +1,7 @@
 /**
  * Discovery Manager - Multi-source skill discovery with deduplication
  */
-import type { StoreManager } from '../store/manager.js';
+import type { StoreManager } from '../store/store-manager.js';
 import type {
   DiscoveryProvider,
   DiscoverySource,

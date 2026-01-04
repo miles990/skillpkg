@@ -6,7 +6,7 @@
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import type { PlatformAdapter } from '../adapters/types.js';
-import { createAdapterManager } from '../adapters/manager.js';
+import { createAdapterManager } from '../adapters/adapter-manager.js';
 import type {
   ImportResult,
   BatchImportResult,

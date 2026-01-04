@@ -71,7 +71,7 @@ export function createFetchSkillContentHandler(): ToolHandler {
 
         if (!result.success || !result.skill) {
           return errorResult(
-            result.error || `Failed to fetch skill from: ${source}`,
+            result.errors?.[0] || `Failed to fetch skill from: ${source}`,
             'Check that the source is valid and the SKILL.md file exists.'
           );
         }

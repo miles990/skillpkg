@@ -2,7 +2,7 @@
  * Local Provider - searches installed skills
  * Reuses existing StoreManager
  */
-import type { StoreManager, SkillMeta } from '../../store/manager.js';
+import type { StoreManager, SkillMeta } from '../../store/store-manager.js';
 import type {
   DiscoveryProvider,
   DiscoverySearchOptions,
