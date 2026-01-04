@@ -5,33 +5,58 @@
 [![npm version](https://img.shields.io/npm/v/skillpkg-cli.svg)](https://www.npmjs.com/package/skillpkg-cli)
 [![npm version](https://img.shields.io/npm/v/skillpkg-mcp-server.svg)](https://www.npmjs.com/package/skillpkg-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Agent Skills](https://img.shields.io/badge/Agent%20Skills-Standard-blue)](https://agentskills.io)
 
-Manage, share, and sync AI agent skills across platforms. Works with **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and more.
+The package manager for AI agent skills. Works with **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, **Cursor**, and any platform that adopts the [Agent Skills open standard](https://agentskills.io).
+
+## The Problem
+
+```
+😫 "I have to copy the same skill files to every project"
+😫 "My team uses different AI coding tools, skills aren't portable"
+😫 "I want AI to learn new skills on-the-fly, but there's no standard way"
+😫 "Managing skill dependencies manually is a nightmare"
+```
+
+## The Solution
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
 │   skillpkg = npm for AI Agent Skills                            │
 │                                                                 │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐      │
-│   │  SKILL.md   │ ──► │   skillpkg  │ ──► │  Claude     │      │
-│   │  (GitHub)   │     │   (管理器)   │     │  Codex      │      │
-│   └─────────────┘     └─────────────┘     │  Copilot    │      │
-│                                           └─────────────┘      │
+│   ┌─────────────┐                      ┌─────────────────────┐  │
+│   │  SKILL.md   │                      │  Claude Code        │  │
+│   │  (GitHub)   │ ───► skillpkg ───►   │  OpenAI Codex       │  │
+│   │  (Gist)     │      install         │  GitHub Copilot     │  │
+│   │  (URL)      │      & sync          │  Cursor             │  │
+│   └─────────────┘                      └─────────────────────┘  │
+│                                                                 │
+│   One skill. All platforms. Zero friction.                      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Features
+## Why skillpkg?
 
-- **Multi-source search** — Search local, GitHub, awesome repos, and skillsmp.com (40K+ skills)
-- **Full directory support** — Skills with scripts, templates, and resources are fully supported
-- **Subpath installation** — Install from subdirectories: `github:user/repo#path/to/skill`
-- **Cross-platform sync** — One skill, multiple AI platforms
-- **Dependency management** — Automatic skill & MCP dependency resolution
-- **Project configuration** — `skillpkg.json` for reproducible setups
-- **MCP Server** — Let AI agents install, uninstall, and sync skills
-- **CLI & API** — Flexible integration options
+| Without skillpkg | With skillpkg |
+|------------------|---------------|
+| Copy skills manually to each project | `skillpkg install` once |
+| Skills only work on one platform | Sync to Claude, Codex, Copilot, Cursor |
+| No dependency management | Automatic skill & MCP dependency resolution |
+| AI can't learn new skills | MCP Server enables AI self-learning |
+| No standard format | Industry-standard SKILL.md format |
+
+## Supported Platforms
+
+skillpkg implements the [Agent Skills open standard](https://agentskills.io) and supports all official adopters:
+
+| Platform | Output Path | Status |
+|----------|-------------|--------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `.claude/skills/` | ✅ Supported |
+| [OpenAI Codex](https://openai.com/index/introducing-codex/) | `.codex/skills/` | ✅ Supported |
+| [GitHub Copilot](https://github.com/features/copilot) | `.github/skills/` | ✅ Supported |
+| [Cursor](https://cursor.com) | `.cursor/skills/` | ✅ Supported |
 
 ## Quick Start
 
@@ -44,126 +69,94 @@ npm install -g skillpkg-cli
 ### Search for Skills
 
 ```bash
-# Search across multiple sources (local → awesome → github)
+# Search across GitHub, awesome-lists, and local skills
 skillpkg search "git commit"
 
 # Example output:
-# Found 8 skills (3 duplicates removed):
-#
-#   git-helper  ⭐120
-#   github:alice/tools#git-helper
-#   Also in: travisvn/awesome-claude-skills
-#
-# Install: skillpkg install <source>
+# Found 8 skills:
+#   commit-helper  ⭐120  github:anthropics/commit-helper
+#   git-expert     ⭐85   github:user/git-skills#expert
 ```
 
 ### Install a Skill
 
 ```bash
-# From GitHub repository
-skillpkg install github:anthropics/claude-code-skills
+# From GitHub
+skillpkg install anthropics/commit-helper
 
-# From subdirectory (subpath support)
+# From subdirectory
 skillpkg install github:user/repo#skills/my-skill
 
-# Shorthand format
-skillpkg install anthropics/claude-code-skills
-
-# From local directory
-skillpkg install ./my-skill
-
-# Install globally
-skillpkg install -g anthropics/claude-code-skills
+# Install globally (available in all projects)
+skillpkg install -g anthropics/commit-helper
 ```
 
-### List Installed Skills
+### Sync to All Platforms
 
 ```bash
-skillpkg list
-skillpkg list -g  # global skills
-```
-
-### Sync to AI Platforms
-
-```bash
-# Sync all skills to detected platforms
+# Sync installed skills to all detected AI platforms
 skillpkg sync
 
-# Sync specific skill to specific platforms
-skillpkg sync my-skill --target claude-code,codex
+# Sync to specific platforms
+skillpkg sync --target claude-code,codex,copilot,cursor
 ```
+
+## Features
+
+- **Multi-source search** — Search GitHub, awesome-lists, and local skills
+- **Cross-platform sync** — One skill works on Claude, Codex, Copilot, Cursor
+- **Full directory support** — Skills with scripts, templates, resources fully supported
+- **Dependency management** — Automatic skill & MCP server dependency resolution
+- **Subpath installation** — Install from repo subdirectories: `user/repo#path/to/skill`
+- **Project configuration** — `skillpkg.json` for reproducible team setups
+- **MCP Server** — Enable AI agents to install and manage skills autonomously
+- **Open standard** — Based on [Agent Skills specification](https://agentskills.io)
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
-| `skillpkg init` | Initialize a project with skillpkg.json |
+| `skillpkg init` | Initialize project with `skillpkg.json` |
 | `skillpkg new [name]` | Create a new skill (SKILL.md) |
-| `skillpkg install [source]` | Install skill(s) with dependency resolution |
+| `skillpkg install [source]` | Install skill with dependency resolution |
 | `skillpkg uninstall <skill>` | Remove a skill (checks dependencies) |
-| `skillpkg list` | List installed skills with dependency info |
+| `skillpkg list` | List installed skills |
 | `skillpkg sync [skill]` | Sync skills to AI platforms |
-| `skillpkg status` | Show project status (skills, MCP, sync) |
-| `skillpkg deps <skill>` | Show dependencies of a skill |
-| `skillpkg why <skill>` | Show why a skill is installed |
-| `skillpkg tree` | Show full dependency tree |
-| `skillpkg search <query>` | Search for skills (multi-source) |
-| `skillpkg info <skill>` | Get detailed skill information |
-| `skillpkg import [path]` | Import existing skills from platform formats |
-| `skillpkg export [skill]` | Export skills to various formats |
+| `skillpkg search <query>` | Search for skills |
+| `skillpkg info <skill>` | Get skill details |
+| `skillpkg status` | Show project status |
 
 ### Install Sources
 
 ```bash
 # GitHub repository
-skillpkg install github:user/repo
 skillpkg install user/repo
+skillpkg install github:user/repo
 
-# GitHub subdirectory (subpath)
+# GitHub subdirectory
 skillpkg install github:user/repo#skills/my-skill
 
 # GitHub Gist
-skillpkg install gist:abc123
+skillpkg install gist:abc123def
 
 # Direct URL
 skillpkg install https://example.com/SKILL.md
 
 # Local path
-skillpkg install ./path/to/skill
-skillpkg install /absolute/path/to/skill
+skillpkg install ./my-local-skill
 ```
 
-## Skill Directory Support
+## MCP Server — AI Self-Learning
 
-Skills can include additional files beyond SKILL.md. When installing, skillpkg downloads the entire directory:
+Enable AI agents to search, install, and manage skills via [Model Context Protocol](https://modelcontextprotocol.io/).
 
-```
-my-skill/
-├── SKILL.md              # Required: skill definition
-├── scripts/
-│   └── main.py           # Python scripts
-├── templates/
-│   └── email.html        # Template files
-├── config/
-│   └── settings.json     # Configuration
-└── resources/
-    └── images/
-        └── icon.png      # Binary files (images, etc.)
-```
-
-All files are preserved during install and sync, maintaining the original directory structure.
-
-## MCP Server
-
-Enable AI agents (like Claude) to search, install, and manage skills via [Model Context Protocol](https://modelcontextprotocol.io/).
-
-### Install
+### Setup for Claude Code
 
 ```bash
-npm install -g skillpkg-mcp-server
+claude mcp add skillpkg -- npx -y skillpkg-mcp-server
 ```
 
-### Configure for Claude Desktop
+### Setup for Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -178,78 +171,44 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-### Configure for Claude Code
+### How AI Self-Learning Works
 
-```bash
-claude mcp add skillpkg -- npx -y skillpkg-mcp-server
+```
+User: Help me write better git commits
+
+Claude: I'll search for a relevant skill...
+        → search_skills("git commit helper")
+
+        Found "commit-helper" - Installing...
+        → install_skill("anthropics/commit-helper")
+
+        Loading skill instructions...
+        → load_skill("commit-helper")
+
+        Now I can help you write conventional commits!
 ```
 
 ### Available MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `list_skills` | List installed skills with dependency info |
-| `search_skills` | Search for skills (multi-source: local, awesome, github) |
-| `recommend_skill` | Get skill recommendations for a use case |
-| `install_skill` | Install a skill with dependency resolution |
-| `uninstall_skill` | Remove a skill (with dependency check) |
-| `sync_skills` | Sync skills to AI platforms |
-| `load_skill` | Load a skill's instructions |
-| `skill_info` | Get detailed information about an installed skill |
-| `skill_status` | Show overall project status |
-| `create_skill` | Create a new skill with SKILL.md format |
-
-### Example: AI Self-Learning
-
-```
-User: Help me write better git commits
-
-Claude: I'll search for a relevant skill...
-        [Uses search_skills: "git commit helper"]
-
-        Found "commit-helper" - Installing...
-        [Uses install_skill: "anthropics/commit-helper"]
-
-        Loading skill instructions...
-        [Uses load_skill: "commit-helper"]
-
-        Now I can help you write better commits!
-```
-
-## Project Configuration
-
-Create a `skillpkg.json` to manage project skills:
-
-```json
-{
-  "name": "my-project",
-  "version": "1.0.0",
-  "skills": {
-    "commit-helper": "github:anthropics/commit-helper",
-    "code-reviewer": "github:my-org/code-reviewer"
-  },
-  "mcp": {
-    "context7": {
-      "package": "@context7/mcp-server"
-    }
-  },
-  "sync_targets": {
-    "claude-code": true
-  }
-}
-```
-
-Then run `skillpkg install` to install all skills with their dependencies.
+| `search_skills` | Search for skills across sources |
+| `recommend_skill` | Get AI-powered skill recommendations |
+| `install_skill` | Install with dependency resolution |
+| `load_skill` | Load skill instructions |
+| `sync_skills` | Sync to AI platforms |
+| `list_skills` | List installed skills |
+| `create_skill` | Create new SKILL.md |
 
 ## SKILL.md Format
 
-The industry standard format for AI agent skills, used by Claude Code and OpenAI Codex.
+The [Agent Skills open standard](https://agentskills.io) uses SKILL.md — Markdown with YAML frontmatter:
 
 ```markdown
 ---
 name: my-skill
 version: 1.0.0
-description: A helpful skill for doing X
+description: A helpful skill for X
 dependencies:
   skills:
     - github:some/other-skill
@@ -272,69 +231,122 @@ Instructions for the AI agent...
 2. Step two
 ```
 
-### Where to Place SKILL.md
+### Skill Directory Structure
 
-skillpkg searches these locations in order:
+Skills can include additional files:
 
-1. `SKILL.md` (root)
-2. `skill.md` (root)
-3. `skills/SKILL.md`
-4. `skills/skill.md`
-5. `.claude/skills/skill.md`
+```
+my-skill/
+├── SKILL.md              # Required: skill definition
+├── scripts/
+│   └── helper.py         # Python scripts
+├── templates/
+│   └── component.tsx     # Template files
+└── examples/
+    └── usage.md          # Examples
+```
+
+## Project Configuration
+
+Create `skillpkg.json` for team-wide skill management:
+
+```json
+{
+  "name": "my-project",
+  "skills": {
+    "commit-helper": "github:anthropics/commit-helper",
+    "code-reviewer": "github:my-org/code-reviewer"
+  },
+  "mcp": {
+    "context7": {
+      "package": "@context7/mcp-server"
+    }
+  },
+  "sync_targets": {
+    "claude-code": true,
+    "codex": true,
+    "copilot": true,
+    "cursor": true
+  }
+}
+```
+
+Then run `skillpkg install` to set up the entire team.
 
 ## Packages
 
-| Package | Version | Description |
-|---------|---------|-------------|
-| [skillpkg-cli](https://www.npmjs.com/package/skillpkg-cli) | 0.5.5 | Command-line interface |
-| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | 0.5.5 | MCP Server for AI agents |
-| [skillpkg-core](https://www.npmjs.com/package/skillpkg-core) | 0.5.5 | Core library |
+| Package | Description |
+|---------|-------------|
+| [skillpkg-cli](https://www.npmjs.com/package/skillpkg-cli) | Command-line interface |
+| [skillpkg-mcp-server](https://www.npmjs.com/package/skillpkg-mcp-server) | MCP Server for AI agents |
+| [skillpkg-core](https://www.npmjs.com/package/skillpkg-core) | Core library (for integrations) |
 
-## Storage Locations
+## Use Cases
 
-| Scope | Path |
-|-------|------|
-| Local (project) | `.skillpkg/` |
-| Global (user) | `~/.skillpkg/` |
+### For Individual Developers
+
+```bash
+# Install your favorite skills globally
+skillpkg install -g anthropics/commit-helper
+skillpkg install -g my-org/code-reviewer
+
+# They're now available in every project
+```
+
+### For Teams
+
+```bash
+# Share skillpkg.json in your repo
+git add skillpkg.json
+git commit -m "Add team AI skills"
+
+# New team members just run:
+skillpkg install
+```
+
+### For AI Tool Builders
+
+```bash
+# Create skills that work everywhere
+skillpkg new my-awesome-skill
+
+# Publish to GitHub, users install with:
+skillpkg install your-org/my-awesome-skill
+```
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `GITHUB_TOKEN` | GitHub API token for higher rate limits |
+| `GITHUB_TOKEN` | GitHub API token (higher rate limits) |
 | `SKILLPKG_HOME` | Custom global storage path |
-| `SKILLSMP_API_KEY` | API key for skillsmp.com (40K+ skills) |
-
-You can also use a `.env` file in your project root or `~/.skillpkg/.env` for global settings.
 
 ## Development
 
 ```bash
-# Clone the repository
 git clone https://github.com/miles990/skillpkg.git
 cd skillpkg
-
-# Install dependencies
 pnpm install
-
-# Build all packages
 pnpm build
-
-# Run tests (246 tests)
-pnpm test
-
-# Development mode
-pnpm dev
+pnpm test  # 246 tests
 ```
+
+## Related Projects
+
+- [Agent Skills Specification](https://agentskills.io) — The open standard
+- [awesome-claude-skills](https://github.com/anthropics/awesome-claude-skills) — Curated skill list
+- [Model Context Protocol](https://modelcontextprotocol.io/) — AI tool integration
 
 ## Contributing
 
-Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) first.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE).
 
 ---
+
+**Keywords**: AI agent skills, Claude Code skills, OpenAI Codex skills, GitHub Copilot skills, Cursor skills, SKILL.md, AI coding assistant, LLM skills, agent skills package manager, AI skill management, cross-platform AI skills
 
 Made with AI, for AI.
