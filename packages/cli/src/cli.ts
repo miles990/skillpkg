@@ -6,11 +6,11 @@ import { initCommand } from './commands/init.js';
 import { installCommand } from './commands/install.js';
 import { listCommand } from './commands/list.js';
 import { uninstallCommand } from './commands/uninstall.js';
-import { syncCommand } from './commands/sync.js';
 import { importCommand } from './commands/import.js';
 import { exportCommand } from './commands/export.js';
 import { searchCommand } from './commands/search.js';
 import { infoCommand } from './commands/info.js';
+import { configCommand } from './commands/config.js';
 // Registry commands - hidden until public registry is available
 // import { loginCommand, logoutCommand, whoamiCommand } from './commands/login.js';
 // import { publishCommand } from './commands/publish.js';
@@ -24,12 +24,15 @@ import { doctorCommand } from './commands/doctor.js';
  * Register all CLI commands
  */
 export function registerCommands(program: Command): void {
-  // init - Initialize a skillpkg project
+  // init - Initialize a skillpkg project with Claude Code configuration
   program
     .command('init')
-    .description('Initialize a skillpkg project (create skillpkg.json)')
+    .description('Initialize Claude Code configuration (skillpkg.json + rules + memory)')
     .option('-y, --yes', 'Use default values without prompts')
     .option('-n, --name <name>', 'Project name')
+    .option('-p, --preset <preset>', 'Use preset (minimal, standard, full, custom)')
+    .option('-d, --domain <domain>', 'Add domain-specific rules (frontend, backend, fullstack, devops)')
+    .option('-t, --template <template>', 'Use custom template from GitHub')
     .action(initCommand);
 
   // new - Create a new skill
@@ -69,13 +72,12 @@ export function registerCommands(program: Command): void {
     .option('--dry-run', 'Show what would be removed without making changes')
     .action(uninstallCommand);
 
-  // sync - Sync skills to platforms
+  // config - Manage global configuration
   program
-    .command('sync [skill]')
-    .description('Sync skills to AI platforms')
-    .option('-t, --target <platforms>', 'Target platforms (comma-separated)')
-    .option('--dry-run', 'Show what would be synced without making changes')
-    .action(syncCommand);
+    .command('config [subcommand] [key] [value]')
+    .description('Manage global skillpkg configuration')
+    .option('--json', 'Output as JSON')
+    .action(configCommand);
 
   // import - Import skills from platform formats
   program

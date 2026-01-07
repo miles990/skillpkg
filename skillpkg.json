@@ -5,7 +5,9 @@
     "mcp-builder": "github:davila7/claude-code-templates#cli-tool/components/skills/development/mcp-builder",
     "codebase-analysis": "github:solatis/claude-config#skills/codebase-analysis",
     "decision-critic": "github:solatis/claude-config#skills/decision-critic",
-    "prompt-engineer": "github:solatis/claude-config#skills/prompt-engineer"
+    "prompt-engineer": "github:solatis/claude-config#skills/prompt-engineer",
+    "evolve": "github:miles990/self-evolving-agent",
+    "research": "./skills/research"
   },
   "mcp": {},
   "reminders": [],

@@ -1,10 +1,11 @@
 /**
  * Tool: install_skill
  *
- * v2.1: Uses unified fetcher from skillpkg-core
+ * v2.2: Auto-sync after install based on global config
  * Returns dependency info and MCP requirements.
  */
 
+import { join } from 'path';
 import type { ToolHandler, ToolResult, InstallSkillInput } from '../types.js';
 import { getStore, successResult, errorResult, validateString, validateScope } from './utils.js';
 import {
@@ -14,6 +15,13 @@ import {
   createSkillFetcherAdapter,
   normalizeSource,
   InvalidSourceError,
+  loadConfig,
+  getGlobalDir,
+  createSyncer,
+  loadSkillsFromDirectory,
+  getTargetConfig,
+  getImplementedTargets,
+  type SyncTarget,
 } from 'skillpkg-core';
 
 export function createInstallSkillHandler(): ToolHandler {
@@ -128,10 +136,21 @@ Returns:
           lines.push('   Configure these in your skillpkg.json or install manually.');
         }
 
+        // Auto-sync if skills were installed/updated
+        if (installed.length > 0 || updated.length > 0) {
+          const syncResult = await autoSyncSkills(cwd, scope);
+          if (syncResult.length > 0) {
+            lines.push('');
+            lines.push('🔄 Auto-synced to:');
+            for (const msg of syncResult) {
+              lines.push(`   ${msg}`);
+            }
+          }
+        }
+
         // Next steps
         lines.push('');
         lines.push('📋 Next steps:');
-        lines.push('   • Run `skillpkg sync` to sync to AI platforms');
         lines.push('   • Run `skillpkg tree` to see dependency tree');
 
         return successResult(lines.join('\n'));
@@ -141,4 +160,73 @@ Returns:
       }
     },
   };
+}
+
+/**
+ * Auto-sync skills to configured targets after install
+ */
+async function autoSyncSkills(
+  cwd: string,
+  scope: 'local' | 'global'
+): Promise<string[]> {
+  const messages: string[] = [];
+
+  try {
+    // Load global config to get auto-sync targets
+    const globalDir = getGlobalDir();
+    const globalConfig = await loadConfig(globalDir);
+
+    // Get enabled auto-sync targets
+    const enabledTargets = Object.entries(globalConfig.autoSyncTargets)
+      .filter(([_, enabled]) => enabled)
+      .map(([target]) => target);
+
+    if (enabledTargets.length === 0) {
+      return messages; // No auto-sync targets configured
+    }
+
+    // Get implemented targets
+    const implementedTargets = getImplementedTargets();
+    const implementedIds = new Set(implementedTargets.map((t) => t.id));
+
+    // Filter to only implemented targets
+    const validTargets = enabledTargets.filter((t) => implementedIds.has(t as SyncTarget));
+
+    if (validTargets.length === 0) {
+      return messages;
+    }
+
+    // Load skills from store
+    const storeDir = scope === 'global' ? globalDir : join(cwd, '.skillpkg');
+    const skillsDir = join(storeDir, 'skills');
+    const skills = await loadSkillsFromDirectory(skillsDir);
+
+    if (skills.size === 0) {
+      return messages;
+    }
+
+    // Create syncer and sync to each target
+    const syncer = createSyncer();
+
+    for (const targetId of validTargets) {
+      const targetConfig = getTargetConfig(targetId as SyncTarget);
+
+      const result = await syncer.syncToTarget(cwd, skills, targetConfig, { dryRun: false });
+
+      if (result.success) {
+        const synced = result.files.filter((f) => f.action === 'created' || f.action === 'updated');
+        if (synced.length > 0) {
+          messages.push(`✅ ${targetConfig.displayName}: ${synced.length} skill(s) synced`);
+        } else {
+          messages.push(`⏭️  ${targetConfig.displayName}: already up to date`);
+        }
+      } else {
+        messages.push(`⚠️  ${targetConfig.displayName}: ${result.errors.join(', ')}`);
+      }
+    }
+  } catch {
+    // Silently ignore sync errors - don't fail the install
+  }
+
+  return messages;
 }

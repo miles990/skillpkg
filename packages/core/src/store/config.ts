@@ -16,6 +16,9 @@ export function getDefaultConfig(): Config {
     registries: {},
     defaultPlatforms: ['claude-code', 'codex', 'copilot', 'cline'],
     autoSync: true,
+    autoSyncTargets: {
+      'claude-code': true,
+    },
     ui: {
       port: 3737,
       openBrowser: true,
@@ -41,6 +44,11 @@ function deepMergeConfig(target: Config, source: Partial<Config>): Config {
   // Merge registries object
   if (source.registries !== undefined) {
     result.registries = { ...target.registries, ...source.registries };
+  }
+
+  // Merge autoSyncTargets object
+  if (source.autoSyncTargets !== undefined) {
+    result.autoSyncTargets = { ...target.autoSyncTargets, ...source.autoSyncTargets };
   }
 
   // Merge nested ui object

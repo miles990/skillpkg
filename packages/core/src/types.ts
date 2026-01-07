@@ -237,6 +237,8 @@ export interface Config {
   registries: Record<string, RegistryConfig>;
   defaultPlatforms: string[];
   autoSync: boolean;
+  /** Auto-sync targets: platforms to auto-sync after install/update (global setting) */
+  autoSyncTargets: Record<string, boolean>;
   ui: {
     port: number;
     openBrowser: boolean;
