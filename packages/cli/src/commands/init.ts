@@ -109,7 +109,7 @@ function createClaudeMd(projectName: string): string {
 ## Project Structure
 
 See @.claude/rules/ for coding standards.
-See @.github/memory/index.md for project knowledge.
+See @.claude/memory/index.md for project knowledge.
 `;
 }
 
@@ -159,7 +159,7 @@ function createAllRules(): Record<string, string> {
 
 ## Memory Workflow
 
-1. Search before starting: \`Grep pattern="keyword" path=".github/memory/"\`
+1. Search before starting: \`Grep pattern="keyword" path=".claude/memory/"\`
 2. Create memory after learning
 3. Update index.md
 `,
@@ -219,9 +219,9 @@ function createMcpConfig(): Record<string, string> {
  */
 function createMemorySystem(): Record<string, string> {
   return {
-    '.github/memory/index.md': `# Project Memory Index
+    '.claude/memory/index.md': `# Project Memory Index
 
-> Search with: \`Grep pattern="keyword" path=".github/memory/"\`
+> Search with: \`Grep pattern="keyword" path=".claude/memory/"\`
 
 ## Learnings
 <!-- LEARNINGS_START -->
@@ -239,11 +239,11 @@ function createMemorySystem(): Record<string, string> {
 <!-- PATTERNS_START -->
 <!-- PATTERNS_END -->
 `,
-    '.github/memory/learnings/.gitkeep': '',
-    '.github/memory/decisions/.gitkeep': '',
-    '.github/memory/failures/.gitkeep': '',
-    '.github/memory/patterns/.gitkeep': '',
-    '.github/memory/strategies/.gitkeep': '',
+    '.claude/memory/learnings/.gitkeep': '',
+    '.claude/memory/decisions/.gitkeep': '',
+    '.claude/memory/failures/.gitkeep': '',
+    '.claude/memory/patterns/.gitkeep': '',
+    '.claude/memory/strategies/.gitkeep': '',
   };
 }
 
@@ -380,7 +380,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
             { name: 'CLAUDE.md (project entry point)', value: 'claude-md', checked: true },
             { name: 'Basic Rules (code quality, testing)', value: 'basic-rules', checked: true },
             { name: 'MCP Configuration (skillpkg, context7)', value: 'mcp-config', checked: true },
-            { name: 'Memory System (.github/memory/)', value: 'memory-system', checked: true },
+            { name: 'Memory System (.claude/memory/)', value: 'memory-system', checked: true },
           ],
         },
         {
