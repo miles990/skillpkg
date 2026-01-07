@@ -33,6 +33,7 @@ export function registerCommands(program: Command): void {
     .option('-p, --preset <preset>', 'Use preset (minimal, standard, full, custom)')
     .option('-d, --domain <domain>', 'Add domain-specific rules (frontend, backend, fullstack, devops)')
     .option('-t, --template <template>', 'Use custom template from GitHub')
+    .option('-i, --install', 'Auto-install skills after init')
     .action(initCommand);
 
   // new - Create a new skill

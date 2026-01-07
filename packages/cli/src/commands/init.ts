@@ -18,6 +18,7 @@ interface InitOptions {
   preset?: 'minimal' | 'standard' | 'full' | 'custom';
   template?: string;
   domain?: string;
+  install?: boolean; // Auto-install skills after init
 }
 
 // Preset configurations
@@ -517,18 +518,49 @@ export async function initCommand(options: InitOptions): Promise<void> {
   safeWriteFile(join(skillsDir, '.gitkeep'), '');
 
   logger.blank();
-  logger.success('Setup complete!');
+  logger.success('Configuration complete!');
   logger.blank();
+
+  // Auto-install skills if requested or ask interactively
+  let shouldInstall = options.install;
+
+  if (skills.length > 0 && !shouldInstall && !options.yes) {
+    const installAnswer = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'install',
+        message: `Install ${skills.length} skill(s) now?`,
+        default: true,
+      },
+    ]);
+    shouldInstall = installAnswer.install;
+  }
+
+  if (skills.length > 0 && shouldInstall) {
+    logger.blank();
+    logger.log(colors.cyan('Installing skills...'));
+    logger.blank();
+
+    // Dynamic import to avoid circular dependencies
+    const { installCommand } = await import('./install.js');
+    await installCommand(undefined, { global: false, dryRun: false });
+  }
 
   // Show next steps
-  logger.log('Next steps:');
+  logger.blank();
+  logger.log(colors.bold('Setup complete! 🎉'));
   logger.blank();
 
-  if (skills.length > 0) {
+  if (skills.length > 0 && !shouldInstall) {
+    logger.log('Next steps:');
+    logger.blank();
     logger.item(`Install skills:    ${colors.cyan('skillpkg install')}`);
+    logger.item(`Start Claude Code: ${colors.cyan('claude')}`);
+  } else {
+    logger.log('You can now start using Claude Code:');
+    logger.blank();
+    logger.item(`Start Claude Code: ${colors.cyan('claude')}`);
   }
-  logger.item(`Sync to Claude:    ${colors.cyan('skillpkg sync')}`);
-  logger.item(`Start Claude Code: ${colors.cyan('claude')}`);
 
   if (skills.includes('miles990/self-evolving-agent')) {
     logger.item(`Try evolving:      ${colors.cyan('/evolve [your goal]')}`);
