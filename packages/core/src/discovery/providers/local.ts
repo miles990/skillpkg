@@ -36,28 +36,43 @@ export class LocalProvider implements DiscoveryProvider {
   }
 
   /**
-   * Search installed skills by name/description
+   * Search installed skills by name/description/triggers/keywords
    */
   async search(options: DiscoverySearchOptions): Promise<DiscoveredSkill[]> {
     const { query, limit = 20 } = options;
     const queryLower = query.toLowerCase();
+    const queryTerms = queryLower.split(/\s+/).filter(Boolean);
 
     // Get all installed skills
     const installed = await this.store.listSkills();
 
-    // Filter by query
-    const matched = installed.filter(
-      (skill) =>
-        skill.name.toLowerCase().includes(queryLower) ||
-        skill.description?.toLowerCase().includes(queryLower)
-    );
+    // Filter by query - match against name, description, triggers, and keywords
+    const matched = installed.filter((skill) => {
+      // Check name
+      if (skill.name.toLowerCase().includes(queryLower)) return true;
+
+      // Check description
+      if (skill.description?.toLowerCase().includes(queryLower)) return true;
+
+      // Check triggers - match any query term against any trigger
+      if (skill.triggers?.some((trigger) =>
+        queryTerms.some((term) => trigger.toLowerCase().includes(term))
+      )) return true;
+
+      // Check keywords - match any query term against any keyword
+      if (skill.keywords?.some((keyword) =>
+        queryTerms.some((term) => keyword.toLowerCase().includes(term))
+      )) return true;
+
+      return false;
+    });
 
     // Convert to DiscoveredSkill format
     const results: DiscoveredSkill[] = matched.map((skill) =>
       this.toDiscoveredSkill(skill)
     );
 
-    // Sort by relevance (name match first)
+    // Sort by relevance (name match > trigger match > description match)
     results.sort((a, b) => {
       const aNameMatch = a.name.toLowerCase().includes(queryLower);
       const bNameMatch = b.name.toLowerCase().includes(queryLower);

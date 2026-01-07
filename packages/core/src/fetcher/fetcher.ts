@@ -530,6 +530,7 @@ export function parseSkillMd(content: string): Skill | null {
       description: (data.description as string) || '',
       author: data.author as Skill['author'],
       keywords: data.keywords as string[] || data.tags as string[],
+      triggers: Array.isArray(data.triggers) ? data.triggers as string[] : undefined,
       dependencies: data.dependencies as Skill['dependencies'],
       instructions: body.trim(),
     };

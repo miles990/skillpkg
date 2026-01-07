@@ -46,6 +46,10 @@ export interface SkillMeta {
   installedAt: string;
   source: 'registry' | 'local' | 'import';
   syncedPlatforms: string[];
+  /** Trigger words for auto-detection */
+  triggers?: string[];
+  /** Keywords for search */
+  keywords?: string[];
 }
 
 /**
@@ -118,6 +122,8 @@ export class StoreManager {
         version: (data.version as string) || '1.0.0',
         description: (data.description as string) || '',
         instructions: body.trim(),
+        triggers: Array.isArray(data.triggers) ? data.triggers : undefined,
+        keywords: Array.isArray(data.keywords) ? data.keywords : undefined,
       };
     } catch {
       return null;
@@ -142,6 +148,8 @@ export class StoreManager {
           installedAt: entry.installedAt,
           source: entry.source,
           syncedPlatforms: entry.syncedPlatforms,
+          triggers: skill.triggers,
+          keywords: skill.keywords,
         });
       }
     }
@@ -350,11 +358,36 @@ export class StoreManager {
    * Convert a Skill to SKILL.md format
    */
   private skillToMarkdown(skill: Skill): string {
-    const frontmatter = {
+    // Build frontmatter with all available fields
+    const frontmatter: Record<string, unknown> = {
+      schema: skill.schema || '1.0',
       name: skill.name,
       version: skill.version,
       description: skill.description,
     };
+
+    // Add optional fields if present
+    if (skill.author) {
+      frontmatter.author = skill.author;
+    }
+    if (skill.triggers && skill.triggers.length > 0) {
+      frontmatter.triggers = skill.triggers;
+    }
+    if (skill.keywords && skill.keywords.length > 0) {
+      frontmatter.keywords = skill.keywords;
+    }
+    if (skill.license) {
+      frontmatter.license = skill.license;
+    }
+    if (skill.repository) {
+      frontmatter.repository = skill.repository;
+    }
+    if (skill.capabilities && skill.capabilities.length > 0) {
+      frontmatter.capabilities = skill.capabilities;
+    }
+    if (skill.dependencies) {
+      frontmatter.dependencies = skill.dependencies;
+    }
 
     // Convert instructions to markdown content
     const content = skill.instructions || '';
