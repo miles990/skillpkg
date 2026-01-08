@@ -3,6 +3,25 @@
  */
 
 /**
+ * Structured triggers for skill matching engine
+ */
+export interface SkillTriggers {
+  /** Keywords for matching */
+  keywords?: {
+    /** Primary keywords (weight: 1.0) - direct match triggers */
+    primary?: string[];
+    /** Secondary keywords (weight: 0.6) - candidate match */
+    secondary?: string[];
+  };
+  /** Context words that boost score (+0.2 when co-occurring) */
+  context_boost?: string[];
+  /** Context words that reduce score (-0.3 when co-occurring) */
+  context_penalty?: string[];
+  /** Priority for tie-breaking (default: medium) */
+  priority?: 'high' | 'medium' | 'low';
+}
+
+/**
  * Skill frontmatter from SKILL.md
  */
 export interface SkillFrontmatter {
@@ -16,8 +35,15 @@ export interface SkillFrontmatter {
   author?: string;
   /** Keywords/tags for search */
   tags?: string[];
+  /** Triggers for skill matching (string[] for legacy, SkillTriggers for new format) */
+  triggers?: string[] | SkillTriggers;
   /** MCP dependencies */
   dependencies?: {
+    /** Skill dependencies */
+    skills?: string[];
+    /** Software skill dependencies (for domain skills) */
+    'software-skills'?: string[];
+    /** MCP server dependencies */
     mcp?: McpDependency[];
   };
 }

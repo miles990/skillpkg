@@ -105,6 +105,7 @@ export class Installer {
             { name: meta.name, source, type: 'skill' as const, transitive: false },
           ],
           mcpToInstall: meta.dependencies?.mcp || [],
+          recommendedSoftwareSkills: [],
           errors: [],
         };
       } else {

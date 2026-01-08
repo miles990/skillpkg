@@ -68,9 +68,52 @@ export const skillSchema = {
       description: 'Keywords for search',
     },
     triggers: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Trigger words to activate the skill',
+      oneOf: [
+        {
+          // Legacy format: simple array of strings
+          type: 'array',
+          items: { type: 'string' },
+        },
+        {
+          // New format: structured triggers for matching engine
+          type: 'object',
+          properties: {
+            keywords: {
+              type: 'object',
+              properties: {
+                primary: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Primary keywords (weight: 1.0) - direct match triggers',
+                },
+                secondary: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Secondary keywords (weight: 0.6) - candidate match',
+                },
+              },
+              additionalProperties: false,
+            },
+            context_boost: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Context words that boost score (+0.2 when co-occurring)',
+            },
+            context_penalty: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Context words that reduce score (-0.3 when co-occurring)',
+            },
+            priority: {
+              type: 'string',
+              enum: ['high', 'medium', 'low'],
+              description: 'Priority for tie-breaking (default: medium)',
+            },
+          },
+          additionalProperties: false,
+        },
+      ],
+      description: 'Trigger words or structured matching configuration',
     },
     capabilities: {
       type: 'array',
@@ -126,13 +169,18 @@ export const skillSchema = {
           additionalProperties: { type: 'string' },
         },
         {
-          // New format: { skills?: string[], mcp?: string[] }
+          // New format: { skills?, software-skills?, mcp? }
           type: 'object',
           properties: {
             skills: {
               type: 'array',
               items: { type: 'string' },
               description: 'Skill dependencies (names or sources)',
+            },
+            'software-skills': {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Software skill dependencies for domain skills (cross-domain)',
             },
             mcp: {
               type: 'array',
@@ -143,7 +191,7 @@ export const skillSchema = {
           additionalProperties: false,
         },
       ],
-      description: 'Skill and MCP dependencies',
+      description: 'Skill, software-skill, and MCP dependencies',
     },
   },
   required: ['schema', 'name', 'version', 'description', 'instructions'],
@@ -163,8 +211,8 @@ export const fieldDescriptions: Record<string, string> = {
   license: 'License identifier (e.g., "MIT")',
   repository: 'Repository URL',
   keywords: 'Keywords for search',
-  triggers: 'Trigger words to activate the skill',
+  triggers: 'Trigger words or structured matching config (keywords.primary/secondary, context_boost/penalty, priority)',
   capabilities: 'Required capabilities (file:read, shell:execute, etc.)',
   platforms: 'Platform-specific configurations',
-  dependencies: 'Skill dependencies with version ranges',
+  dependencies: 'Skill, software-skill, and MCP dependencies',
 };

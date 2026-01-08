@@ -54,6 +54,8 @@ export interface SkillDependencies {
   skills?: string[];
   /** MCP server dependencies */
   mcp?: string[];
+  /** Software skills recommended by domain skills (soft dependency) */
+  'software-skills'?: string[];
 }
 
 /**
@@ -70,7 +72,11 @@ export type Dependencies = SkillDependencies | LegacyDependencies;
  * Check if dependencies is in new format
  */
 export function isSkillDependencies(deps: Dependencies): deps is SkillDependencies {
-  return deps !== null && typeof deps === 'object' && ('skills' in deps || 'mcp' in deps);
+  return (
+    deps !== null &&
+    typeof deps === 'object' &&
+    ('skills' in deps || 'mcp' in deps || 'software-skills' in deps)
+  );
 }
 
 /**
@@ -78,13 +84,14 @@ export function isSkillDependencies(deps: Dependencies): deps is SkillDependenci
  */
 export function normalizeDependencies(deps?: Dependencies): SkillDependencies {
   if (!deps) {
-    return { skills: [], mcp: [] };
+    return { skills: [], mcp: [], 'software-skills': [] };
   }
 
   if (isSkillDependencies(deps)) {
     return {
       skills: deps.skills || [],
       mcp: deps.mcp || [],
+      'software-skills': deps['software-skills'] || [],
     };
   }
 
@@ -92,6 +99,7 @@ export function normalizeDependencies(deps?: Dependencies): SkillDependencies {
   return {
     skills: Object.keys(deps),
     mcp: [],
+    'software-skills': [],
   };
 }
 

@@ -15,6 +15,7 @@ import { createInstallSkillHandler } from './install-skill.js';
 import { createUninstallSkillHandler } from './uninstall-skill.js';
 import { createSkillInfoHandler } from './skill-info.js';
 import { createRecommendSkillHandler } from './recommend-skill.js';
+import { createRecommendSkillsHandler } from './recommend-skills.js';
 import { createSyncSkillsHandler } from './sync-skills.js';
 import { createCreateSkillHandler } from './create-skill.js';
 import { createSkillStatusHandler } from './skill-status.js';
@@ -38,6 +39,7 @@ export function createAllToolHandlers(): ToolHandler[] {
     createSearchSkillsHandler(),
     createSkillInfoHandler(),
     createRecommendSkillHandler(),
+    createRecommendSkillsHandler(), // New: Uses MatchingEngine for installed skills
     createFetchSkillContentHandler(),
   ];
 }
@@ -54,6 +56,7 @@ export {
   createSkillStatusHandler,
   createSkillInfoHandler,
   createRecommendSkillHandler,
+  createRecommendSkillsHandler,
   createFetchSkillContentHandler,
 };
 

@@ -44,8 +44,20 @@ export interface ResolutionResult {
   circularChain?: string[];
   /** MCP servers that need to be installed */
   mcpToInstall: string[];
+  /** Recommended software skills (from domain skill dependencies) */
+  recommendedSoftwareSkills: SoftwareSkillRecommendation[];
   /** Errors during resolution */
   errors: string[];
+}
+
+/**
+ * Software skill recommendation from domain skill
+ */
+export interface SoftwareSkillRecommendation {
+  /** Software skill name */
+  name: string;
+  /** Domain skill that recommends this */
+  recommendedBy: string;
 }
 
 /**
@@ -79,5 +91,7 @@ export interface SkillMetadata {
   dependencies?: {
     skills?: string[];
     mcp?: string[];
+    /** Software skills recommended by domain skills (soft dependency) */
+    'software-skills'?: string[];
   };
 }

@@ -56,3 +56,6 @@ export * from './discovery/index.js';
 
 // Doctor module - Diagnose and repair state
 export * from './doctor/index.js';
+
+// Matching module - Skill matching engine
+export * from './matching/index.js';

@@ -31,12 +31,14 @@ export class DependencyResolver {
     const result: ResolutionResult = {
       dependencies: [],
       mcpToInstall: [],
+      recommendedSoftwareSkills: [],
       errors: [],
     };
 
     const visited = new Set<string>();
     const inProgress = new Set<string>(); // For circular detection
     const resolved: ResolvedDependency[] = [];
+    const softwareSkillsMap = new Map<string, string>(); // name -> recommendedBy
 
     try {
       await this.resolveRecursive(
@@ -46,6 +48,7 @@ export class DependencyResolver {
         inProgress,
         resolved,
         result,
+        softwareSkillsMap,
         null
       );
 
@@ -55,6 +58,11 @@ export class DependencyResolver {
 
       // Deduplicate MCP dependencies
       result.mcpToInstall = [...new Set(result.mcpToInstall)];
+
+      // Convert software skills map to array
+      result.recommendedSoftwareSkills = Array.from(softwareSkillsMap.entries()).map(
+        ([name, recommendedBy]) => ({ name, recommendedBy })
+      );
     } catch (error) {
       if (error instanceof CircularDependencyError) {
         result.circularChain = error.chain;
@@ -77,6 +85,7 @@ export class DependencyResolver {
     inProgress: Set<string>,
     resolved: ResolvedDependency[],
     result: ResolutionResult,
+    softwareSkillsMap: Map<string, string>,
     requiredBy: string | null
   ): Promise<void> {
     // Normalize source to skill name for deduplication
@@ -122,6 +131,7 @@ export class DependencyResolver {
           inProgress,
           resolved,
           result,
+          softwareSkillsMap,
           skillName
         );
       }
@@ -130,6 +140,15 @@ export class DependencyResolver {
       for (const mcp of deps.mcp || []) {
         if (!result.mcpToInstall.includes(mcp)) {
           result.mcpToInstall.push(mcp);
+        }
+      }
+
+      // Collect software-skills recommendations (soft dependencies from domain skills)
+      const softwareSkills = deps['software-skills'] || [];
+      for (const softwareSkill of softwareSkills) {
+        // Only store the first recommender for each software skill
+        if (!softwareSkillsMap.has(softwareSkill)) {
+          softwareSkillsMap.set(softwareSkill, metadata.name || skillName);
         }
       }
 

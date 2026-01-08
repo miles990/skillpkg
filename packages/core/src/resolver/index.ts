@@ -37,6 +37,7 @@ export type {
   McpResolutionResult,
   SkillFetcher,
   SkillMetadata,
+  SoftwareSkillRecommendation,
 } from './types.js';
 
 // DependencyResolver
