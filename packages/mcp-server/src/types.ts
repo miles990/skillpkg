@@ -10,7 +10,7 @@
 
 export type Scope = 'local' | 'global';
 export type Source = 'all' | 'local' | 'github';
-export type DiscoverySourceType = 'all' | 'local' | 'skillsmp' | 'awesome' | 'github';
+export type DiscoverySourceType = 'all' | 'priority' | 'local' | 'skillsmp' | 'awesome' | 'github';
 export type SourceType = 'github' | 'gist' | 'url' | 'local';
 export type RecommendCriteria = 'auto' | 'popular' | 'highest_rated' | 'newest';
 
@@ -67,7 +67,7 @@ export interface SearchSkillResult {
   description: string;
   version?: string;
   source: string; // Install source (e.g., "github:user/repo#path")
-  provider: 'local' | 'skillsmp' | 'awesome' | 'github';
+  provider: 'priority' | 'local' | 'skillsmp' | 'awesome' | 'github';
   installed?: boolean;
   stars?: number;
   author?: string;

@@ -3,6 +3,7 @@
  *
  * Multi-source skill discovery with deduplication.
  * Uses DiscoveryManager to search across:
+ * - priority: Priority repos (miles990/claude-software-skills, claude-domain-skills) - SEARCHED FIRST
  * - local: Installed skills
  * - skillsmp: Primary registry (40K+ skills, requires API key)
  * - awesome: Fallback curated repos (no key required)
@@ -44,9 +45,9 @@ export function createSearchSkillsHandler(): ToolHandler {
         },
         source: {
           type: 'string',
-          enum: ['all', 'local', 'github'],
+          enum: ['all', 'priority', 'local', 'github'],
           default: 'all',
-          description: 'Where to search: all, local (installed only), or github (GitHub repositories with SKILL.md)',
+          description: 'Where to search: all (default), priority (miles990/claude-software-skills first), local (installed only), or github (general GitHub search)',
         },
         limit: {
           type: 'number',
@@ -67,7 +68,9 @@ export function createSearchSkillsHandler(): ToolHandler {
 
         // Map input source to discovery sources
         let sources: DiscoverySource[] | undefined;
-        if (sourceInput === 'local') {
+        if (sourceInput === 'priority') {
+          sources = ['priority'];
+        } else if (sourceInput === 'local') {
           sources = ['local'];
         } else if (sourceInput === 'github') {
           sources = ['github'];

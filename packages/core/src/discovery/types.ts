@@ -5,7 +5,7 @@
 /**
  * Discovery source types
  */
-export type DiscoverySource = 'local' | 'skillsmp' | 'awesome' | 'github';
+export type DiscoverySource = 'priority' | 'local' | 'skillsmp' | 'awesome' | 'github';
 
 /**
  * Discovered skill info (from any source)
@@ -112,4 +112,6 @@ export interface DiscoveryManagerOptions {
   githubToken?: string;
   /** Store manager for local provider */
   storeManager?: unknown;
+  /** Priority repos to search first (default: miles990/claude-software-skills, claude-domain-skills) */
+  priorityRepos?: string[];
 }

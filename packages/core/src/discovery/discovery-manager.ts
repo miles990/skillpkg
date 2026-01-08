@@ -15,6 +15,7 @@ import {
   SkillsmpProvider,
   AwesomeProvider,
   GitHubProvider,
+  PriorityProvider,
 } from './providers/index.js';
 
 /**
@@ -28,6 +29,15 @@ export class DiscoveryManager {
   constructor(options: DiscoveryManagerOptions = {}) {
     this.skillsmpApiKey = options.skillsmpApiKey || null;
     this.githubToken = options.githubToken || process.env.GITHUB_TOKEN || null;
+
+    // Priority provider (first search source - user-defined repos)
+    this.providers.set(
+      'priority',
+      new PriorityProvider({
+        githubToken: this.githubToken || undefined,
+        priorityRepos: options.priorityRepos,
+      })
+    );
 
     // Initialize providers
     if (options.storeManager) {
@@ -68,11 +78,21 @@ export class DiscoveryManager {
   /**
    * Get default sources based on configuration
    *
-   * With skillsmp key:  local → skillsmp (40K+) → github
-   * Without key:        local → awesome (~30) → github
+   * Search order: priority → local → skillsmp/awesome → github
+   *
+   * With skillsmp key:  priority → local → skillsmp (40K+) → github
+   * Without key:        priority → local → awesome (~30) → github
    */
   getDefaultSources(): DiscoverySource[] {
     const sources: DiscoverySource[] = [];
+
+    // Priority repos first (miles990/claude-software-skills, claude-domain-skills)
+    if (this.providers.has('priority')) {
+      const priorityProvider = this.providers.get('priority') as PriorityProvider;
+      if (priorityProvider.isConfigured()) {
+        sources.push('priority');
+      }
+    }
 
     // Always include local if available
     if (this.providers.has('local')) {

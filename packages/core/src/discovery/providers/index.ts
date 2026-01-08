@@ -27,3 +27,10 @@ export {
   createGitHubProvider,
   type GitHubProviderOptions,
 } from './github.js';
+
+export {
+  PriorityProvider,
+  createPriorityProvider,
+  DEFAULT_PRIORITY_REPOS,
+  type PriorityProviderOptions,
+} from './priority.js';
