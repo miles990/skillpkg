@@ -23,12 +23,13 @@ export interface SkillTriggers {
 
 /**
  * Skill frontmatter from SKILL.md
+ * Compatible with Claude Code / superpowers minimal format (name + description only)
  */
 export interface SkillFrontmatter {
   /** Unique skill identifier in kebab-case */
   name: string;
-  /** Semantic version (e.g., "1.0.0") */
-  version: string;
+  /** Semantic version (e.g., "1.0.0") - optional, defaults to "1.0.0" */
+  version?: string;
   /** Short description of the skill */
   description: string;
   /** Author name or object */

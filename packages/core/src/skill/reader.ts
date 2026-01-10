@@ -25,40 +25,34 @@ export class SkillValidationError extends Error {
 
 /**
  * Validate skill metadata
+ * Compatible with Claude Code / superpowers minimal format (name + description only)
  */
 function validateMetadata(data: Record<string, unknown>): SkillFrontmatter {
-  // Required fields
+  // Required fields (only name and description are truly required)
   if (!data.name || typeof data.name !== 'string') {
     throw new SkillValidationError('Missing required field: name', 'name');
-  }
-
-  if (!data.version || typeof data.version !== 'string') {
-    throw new SkillValidationError('Missing required field: version', 'version');
   }
 
   if (!data.description || typeof data.description !== 'string') {
     throw new SkillValidationError('Missing required field: description', 'description');
   }
 
-  // Validate name format (kebab-case)
-  if (!/^[a-z][a-z0-9-]*[a-z0-9]$/.test(data.name) && data.name.length >= 2) {
-    throw new SkillValidationError(
-      'Name must be kebab-case (e.g., my-skill)',
-      'name'
-    );
+  // Validate name format (kebab-case) - be lenient, just warn if invalid
+  const namePattern = /^[a-z][a-z0-9-]*[a-z0-9]$/;
+  if (data.name.length >= 2 && !namePattern.test(data.name)) {
+    // Allow but don't enforce strict kebab-case for compatibility
+    console.warn(`Warning: name "${data.name}" is not in kebab-case format`);
   }
 
-  // Validate version format (semver-like)
-  if (!/^\d+\.\d+\.\d+/.test(data.version)) {
-    throw new SkillValidationError(
-      'Version must be semver format (e.g., 1.0.0)',
-      'version'
-    );
+  // Validate version format if provided (semver-like)
+  const version = typeof data.version === 'string' ? data.version : '1.0.0';
+  if (data.version && !/^\d+\.\d+\.\d+/.test(version)) {
+    console.warn(`Warning: version "${data.version}" is not in semver format, using default`);
   }
 
   return {
     name: data.name,
-    version: data.version,
+    version: /^\d+\.\d+\.\d+/.test(version) ? version : '1.0.0',
     description: data.description,
     author: data.author as string | undefined,
     tags: Array.isArray(data.tags) ? data.tags : undefined,

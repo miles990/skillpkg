@@ -194,8 +194,10 @@ export const skillSchema = {
       description: 'Skill, software-skill, and MCP dependencies',
     },
   },
-  required: ['schema', 'name', 'version', 'description', 'instructions'],
-  additionalProperties: false,
+  // Only name and description are required for Claude Code / superpowers compatibility
+  // Other fields (schema, version, instructions) have sensible defaults
+  required: ['name', 'description'],
+  additionalProperties: true, // Allow additional fields for extensibility
 } as const;
 
 /**
