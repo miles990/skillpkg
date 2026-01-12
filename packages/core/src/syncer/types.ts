@@ -157,6 +157,8 @@ export interface SyncerOptions {
   force?: boolean;
   /** Verbose output */
   verbose?: boolean;
+  /** Sync only SKILL.md without additional files (scripts, references, etc.) */
+  essentialOnly?: boolean;
 }
 
 /**

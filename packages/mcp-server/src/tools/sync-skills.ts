@@ -24,6 +24,7 @@ interface SyncSkillsInput {
   scope?: 'local' | 'global';
   target?: string;
   dryRun?: boolean;
+  essentialOnly?: boolean;
 }
 
 /**
@@ -98,6 +99,11 @@ Returns:
           type: 'boolean',
           default: false,
           description: 'Preview sync without making changes',
+        },
+        essentialOnly: {
+          type: 'boolean',
+          default: false,
+          description: 'Sync only SKILL.md without additional files (scripts, references)',
         },
       },
       required: [],
@@ -175,7 +181,10 @@ Returns:
           const targetConfig = getTargetConfig(targetId);
           lines.push(`📁 Target: ${targetConfig.displayName} (${targetConfig.outputPath})`);
 
-          const result = await syncer.syncToTarget(cwd, skills, targetConfig, { dryRun });
+          const result = await syncer.syncToTarget(cwd, skills, targetConfig, {
+            dryRun,
+            essentialOnly: input.essentialOnly,
+          });
 
           if (!result.success) {
             lines.push(`   ❌ Error: ${result.errors.join(', ')}`);

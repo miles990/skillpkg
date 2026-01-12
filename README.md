@@ -148,6 +148,16 @@ skillpkg install https://example.com/SKILL.md
 skillpkg install ./my-local-skill
 ```
 
+### Install Options
+
+| Option | Description |
+|--------|-------------|
+| `-g, --global` | Install to global store (available in all projects) |
+| `--dry-run` | Preview installation without making changes |
+| `--essential-only` | Install only SKILL.md without additional files (scripts, templates) |
+
+The `--essential-only` option is useful when you only need the core skill instructions without auxiliary files like scripts, templates, or examples. This reduces the installed size and keeps your skills directory lean.
+
 ## MCP Server — AI Self-Learning
 
 Enable AI agents to search, install, and manage skills via [Model Context Protocol](https://modelcontextprotocol.io/).

@@ -33,6 +33,7 @@ interface InstallOptions {
   global?: boolean;
   registry?: string;
   dryRun?: boolean;
+  essentialOnly?: boolean;
 }
 
 /**
@@ -83,7 +84,10 @@ export async function installCommand(
 
   // Run installation
   const result = await withSpinner('Resolving dependencies', async () => {
-    return installer.install(cwd, source, { dryRun: options.dryRun });
+    return installer.install(cwd, source, {
+      dryRun: options.dryRun,
+      essentialOnly: options.essentialOnly,
+    });
   });
 
   // Show results

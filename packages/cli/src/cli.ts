@@ -51,6 +51,7 @@ export function registerCommands(program: Command): void {
     .option('-g, --global', 'Install globally')
     .option('--registry <url>', 'Use custom registry')
     .option('--dry-run', 'Show what would be installed without making changes')
+    .option('--essential-only', 'Install only SKILL.md without additional files (scripts, references)')
     .action(installCommand);
 
   // list - List installed skills

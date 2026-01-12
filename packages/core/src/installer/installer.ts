@@ -172,7 +172,7 @@ export class Installer {
       const skillsToInstall = getSkillsToInstall(plan);
 
       for (const step of skillsToInstall) {
-        const skillResult = await this.installSingleSkill(projectPath, step.source, step);
+        const skillResult = await this.installSingleSkill(projectPath, step.source, step, options);
         result.skills.push({
           ...skillResult,
           transitive: step.isTransitive,
@@ -231,7 +231,8 @@ export class Installer {
   private async installSingleSkill(
     projectPath: string,
     source: string,
-    step: { name: string; source: string; isTransitive: boolean; requiredBy?: string }
+    step: { name: string; source: string; isTransitive: boolean; requiredBy?: string },
+    options: InstallOptions = {}
   ): Promise<SkillInstallResult> {
     try {
       // Fetch the full skill (with files)
@@ -254,6 +255,9 @@ export class Installer {
       const existing = await this.storeManager.getSkill(skill.name);
       const action: 'installed' | 'updated' = existing ? 'updated' : 'installed';
 
+      // Filter files based on essentialOnly option
+      const filesToInstall = options.essentialOnly ? [] : files;
+
       // Add/update in store (with files)
       if (existing) {
         await this.storeManager.updateSkill(skill.name, skill);
@@ -261,7 +265,7 @@ export class Installer {
         await this.storeManager.addSkill(skill, {
           source: 'registry',
           sourceUrl: source,
-          files,
+          files: filesToInstall,
         });
       }
 

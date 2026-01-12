@@ -328,6 +328,77 @@ describe('Syncer', () => {
       expect(existsSync(skillFile)).toBe(false);
     });
   });
+
+  describe('essentialOnly mode', () => {
+    it('should only sync SKILL.md without additional files', async () => {
+      const syncer = createSyncer();
+
+      // Create skill with additional files (simulating a skill directory with scripts)
+      const skillSourceDir = join(SKILLS_DIR, 'skill-with-scripts');
+      await mkdir(skillSourceDir, { recursive: true });
+      await writeFile(
+        join(skillSourceDir, 'SKILL.md'),
+        `---\nname: skill-with-scripts\nversion: 1.0.0\n---\n\n# Skill with Scripts\n\nMain instructions.`
+      );
+      await writeFile(join(skillSourceDir, 'helper.sh'), '#!/bin/bash\necho "helper"');
+      await writeFile(join(skillSourceDir, 'utils.py'), 'print("utils")');
+
+      // Load skills from directory (this sets sourcePath)
+      const skills = await loadSkillsFromDirectory(SKILLS_DIR);
+      expect(skills.has('skill-with-scripts')).toBe(true);
+
+      const targetConfig = getTargetConfig('claude-code');
+
+      // Sync with essentialOnly: true
+      const result = await syncer.syncToTarget(TEST_DIR, skills, targetConfig, {
+        essentialOnly: true,
+      });
+
+      expect(result.success).toBe(true);
+
+      // SKILL.md should exist
+      const skillFile = join(TEST_DIR, '.claude/skills/skill-with-scripts/SKILL.md');
+      expect(existsSync(skillFile)).toBe(true);
+
+      // Additional files should NOT exist
+      const helperFile = join(TEST_DIR, '.claude/skills/skill-with-scripts/helper.sh');
+      const utilsFile = join(TEST_DIR, '.claude/skills/skill-with-scripts/utils.py');
+      expect(existsSync(helperFile)).toBe(false);
+      expect(existsSync(utilsFile)).toBe(false);
+    });
+
+    it('should copy all files without essentialOnly option', async () => {
+      const syncer = createSyncer();
+
+      // Create skill with additional files
+      const skillSourceDir = join(SKILLS_DIR, 'full-skill');
+      await mkdir(skillSourceDir, { recursive: true });
+      await writeFile(
+        join(skillSourceDir, 'SKILL.md'),
+        `---\nname: full-skill\nversion: 1.0.0\n---\n\n# Full Skill\n\nMain instructions.`
+      );
+      await writeFile(join(skillSourceDir, 'script.sh'), '#!/bin/bash\necho "script"');
+
+      // Load skills from directory
+      const skills = await loadSkillsFromDirectory(SKILLS_DIR);
+      expect(skills.has('full-skill')).toBe(true);
+
+      const targetConfig = getTargetConfig('claude-code');
+
+      // Sync without essentialOnly (default behavior)
+      const result = await syncer.syncToTarget(TEST_DIR, skills, targetConfig, {
+        essentialOnly: false,
+      });
+
+      expect(result.success).toBe(true);
+
+      // Both SKILL.md and additional files should exist
+      const skillFile = join(TEST_DIR, '.claude/skills/full-skill/SKILL.md');
+      const scriptFile = join(TEST_DIR, '.claude/skills/full-skill/script.sh');
+      expect(existsSync(skillFile)).toBe(true);
+      expect(existsSync(scriptFile)).toBe(true);
+    });
+  });
 });
 
 describe('loadSkillContent', () => {

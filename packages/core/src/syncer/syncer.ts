@@ -221,8 +221,8 @@ export class Syncer {
       }
 
       if (!options.dryRun) {
-        // If source path exists, copy entire directory
-        if (skill.sourcePath && existsSync(skill.sourcePath)) {
+        // If source path exists and not essentialOnly, copy entire directory
+        if (skill.sourcePath && existsSync(skill.sourcePath) && !options.essentialOnly) {
           // Remove existing target directory first (to clean up stale files)
           if (existsSync(skillDir)) {
             await rm(skillDir, { recursive: true });
@@ -245,7 +245,7 @@ export class Syncer {
             });
           }
         } else {
-          // No source path, just write SKILL.md
+          // No source path or essentialOnly mode, just write SKILL.md
           await mkdir(skillDir, { recursive: true });
           await writeFile(skillFile, content, 'utf-8');
         }

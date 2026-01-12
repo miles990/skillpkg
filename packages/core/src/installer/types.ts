@@ -25,6 +25,8 @@ export interface InstallOptions {
   dryRun?: boolean;
   /** Verbose output */
   verbose?: boolean;
+  /** Install only SKILL.md without additional files (scripts, references, etc.) */
+  essentialOnly?: boolean;
 }
 
 /**

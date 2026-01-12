@@ -238,6 +238,22 @@ describe('Installer', () => {
       expect(skillB).not.toBeNull();
     });
 
+    it('should install with essentialOnly option', async () => {
+      await initProject('test-project');
+
+      const result = await installer.install(PROJECT_DIR, 'github:user/skill-a', {
+        essentialOnly: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.stats.installed).toBe(1);
+
+      // Skill should be installed
+      const skill = await storeManager.getSkill('skill-a');
+      expect(skill).not.toBeNull();
+      expect(skill?.version).toBe('1.0.0');
+    });
+
     it('should update skillpkg.json after installation', async () => {
       await initProject('test-project');
 
