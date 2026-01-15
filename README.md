@@ -1,5 +1,45 @@
 # skillpkg
 
+> ⚠️ **ARCHIVED** — This project has been superseded by [Claude Code Plugin Marketplace](https://code.claude.com/docs/en/discover-plugins).
+
+---
+
+## 🔀 Migration Guide
+
+Claude Code now has a built-in Plugin system that covers skillpkg's core functionality:
+
+| skillpkg | Claude Code Plugin |
+|----------|-------------------|
+| `skillpkg search` | `/plugin` → Discover tab |
+| `skillpkg install` | `/plugin install {plugin}@{marketplace}` |
+| `skillpkg sync` | Automatic (plugins auto-sync) |
+| MCP Server | No longer needed |
+
+### Recommended: Use evolve Plugin
+
+If you were using skillpkg to install **Self-Evolving Agent**:
+
+```bash
+# New method (Plugin)
+/plugin marketplace add miles990/evolve-plugin
+/plugin install evolve@evolve-plugin
+
+# Old method (deprecated)
+# skillpkg install github:miles990/self-evolving-agent
+```
+
+### For Skill Authors
+
+Skills should now be packaged as **Claude Code Plugins**. See:
+- [Plugin Documentation](https://code.claude.com/docs/en/plugins)
+- [Example: evolve-plugin](https://github.com/miles990/evolve-plugin)
+
+---
+
+> The content below is preserved for historical reference.
+
+---
+
 > **Agent Skills Package Manager** — Install once, use everywhere.
 
 [![npm version](https://img.shields.io/npm/v/skillpkg-cli.svg)](https://www.npmjs.com/package/skillpkg-cli)
